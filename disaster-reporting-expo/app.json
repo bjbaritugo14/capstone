@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "MDRRMO Disaster Reporting App",
+    "slug": "disaster-reporting-expo",
+    "scheme": "disasterreportingexpo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": [
+      "android",
+      "ios",
+      "web"
+    ],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Disaster Reporting to access your photos so you can attach damage evidence.",
+          "cameraPermission": "Allow Disaster Reporting to use your camera so you can capture damage evidence."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Disaster Reporting to access your location so it can attach GPS coordinates to your report."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.anonymous.disasterreportingexpo"
+    }
+  }
+}
