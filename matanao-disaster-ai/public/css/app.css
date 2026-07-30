@@ -690,6 +690,13 @@ textarea {
     align-items: end;
 }
 
+.audit-filter-form {
+    display: grid;
+    grid-template-columns: 1.2fr 0.9fr 0.9fr auto;
+    gap: 12px;
+    align-items: end;
+}
+
 .filter-actions {
     display: flex;
     gap: 10px;
@@ -703,6 +710,56 @@ textarea {
     padding: 16px;
     background: rgba(255, 249, 242, 0.72);
     margin-top: 14px;
+}
+
+.affected-families-layout {
+    align-items: start;
+}
+
+.barangay-selector-list {
+    display: grid;
+    gap: 12px;
+}
+
+.barangay-selector-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: center;
+    padding: 16px 18px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: rgba(255, 249, 242, 0.72);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.barangay-selector-card p {
+    margin-top: 6px;
+    color: var(--muted);
+}
+
+.barangay-selector-card:hover {
+    transform: translateY(-1px);
+    border-color: #c8b38e;
+    box-shadow: var(--shadow);
+}
+
+.barangay-selector-card.active {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, rgba(31, 95, 74, 0.12), rgba(255, 249, 242, 0.92));
+    box-shadow: var(--shadow);
+}
+
+.empty-state-panel {
+    display: grid;
+    gap: 10px;
+    min-height: 280px;
+    place-content: center;
+    text-align: center;
+    border: 1px dashed var(--border);
+    border-radius: 18px;
+    background: rgba(255, 249, 242, 0.5);
+    padding: 24px;
 }
 
 .report-image-grid {
@@ -754,6 +811,35 @@ textarea {
 .header-actions {
     display: flex;
     gap: 12px;
+}
+
+.detail-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.detail-chip {
+    display: grid;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.82);
+    min-width: 180px;
+}
+
+.detail-chip strong {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--secondary);
+}
+
+.detail-chip span {
+    color: var(--text);
+    line-height: 1.5;
 }
 
 .inline-form {
@@ -843,6 +929,7 @@ textarea {
     .admin-password-form,
     .report-image-grid,
     .filter-form,
+    .audit-filter-form,
     .decision-rule-grid,
     .hero-strip,
     .auth-shell,

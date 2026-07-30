@@ -15,20 +15,18 @@ class AffectedFamilyController extends Controller
     {
         $filters = $request->validate([
             'name' => ['nullable', 'string', 'max:150'],
-            'barangay_id' => ['nullable', 'integer', 'exists:barangays,barangay_id'],
         ]);
 
         $name = trim((string) ($filters['name'] ?? ''));
-        $selectedBarangayId = $filters['barangay_id'] ?? null;
+        $isValidatedOnlyView = $this->isDswdView($request);
 
-        $barangays = Barangay::query()
-            ->when($selectedBarangayId, fn ($query) => $query->where('barangay_id', $selectedBarangayId))
+        $barangaySummaries = Barangay::query()
             ->with([
+                'locations.disasterReports' => fn ($query) => $query
+                    ->when($isValidatedOnlyView, fn ($reportQuery) => $reportQuery->where('status', 'validated'))
+                    ->latest('incident_datetime'),
                 'locations.disasterReports.affectedFamilyRecords' => fn ($query) => $query
                     ->when($name !== '', fn ($familyQuery) => $familyQuery->where('family_head_name', 'like', "%{$name}%")),
-                'locations.disasterReports.affectedFamilyRecords.images',
-                'locations.disasterReports.images',
-                'locations.disasterReports.user',
             ])
             ->orderBy('barangay_name')
             ->get()
@@ -46,17 +44,64 @@ class AffectedFamilyController extends Controller
                     'member_count' => $reports->sum(fn ($report) => $report->affectedFamilyRecords->sum('household_members')),
                 ];
             })
-            ->filter(fn (array $group) => $group['reports']->isNotEmpty() || $name === '')
+            ->filter(function (array $group) use ($name, $isValidatedOnlyView) {
+                if ($group['family_count'] > 0 || $group['reports']->isNotEmpty()) {
+                    return true;
+                }
+
+                return $name === '' && ! $isValidatedOnlyView;
+            })
             ->values();
 
-        $allBarangays = Barangay::query()
-            ->orderBy('barangay_name')
-            ->get();
-
-        return view('affected-families.index', compact('barangays', 'allBarangays', 'name', 'selectedBarangayId'));
+        return view('affected-families.index', [
+            'barangaySummaries' => $barangaySummaries,
+            'name' => $name,
+            'isValidatedOnlyView' => $isValidatedOnlyView,
+        ]);
     }
 
-    public function destroy(DamageReport $report): RedirectResponse
+    public function show(Request $request, Barangay $barangay): View
+    {
+        $filters = $request->validate([
+            'name' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $name = trim((string) ($filters['name'] ?? ''));
+        $isValidatedOnlyView = $this->isDswdView($request);
+
+        $barangay->load([
+            'locations.disasterReports' => fn ($query) => $query
+                ->when($isValidatedOnlyView, fn ($reportQuery) => $reportQuery->where('status', 'validated'))
+                ->latest('incident_datetime'),
+            'locations.disasterReports.affectedFamilyRecords' => fn ($query) => $query
+                ->when($name !== '', fn ($familyQuery) => $familyQuery->where('family_head_name', 'like', "%{$name}%")),
+            'locations.disasterReports.affectedFamilyRecords.images',
+            'locations.disasterReports.images',
+            'locations.disasterReports.user',
+        ]);
+
+        $reports = $barangay->locations
+            ->flatMap->disasterReports
+            ->filter(fn ($report) => $name === '' || $report->affectedFamilyRecords->isNotEmpty())
+            ->sortByDesc('incident_datetime')
+            ->values();
+
+        $selectedBarangayGroup = [
+            'barangay' => $barangay,
+            'reports' => $reports,
+            'family_count' => $reports->sum(fn ($report) => $report->affectedFamilyRecords->count() ?: $report->affected_families),
+            'member_count' => $reports->sum(fn ($report) => $report->affectedFamilyRecords->sum('household_members')),
+        ];
+
+        return view('affected-families.show', [
+            'selectedBarangayGroup' => $selectedBarangayGroup,
+            'name' => $name,
+            'canDelete' => ! $isValidatedOnlyView,
+            'isValidatedOnlyView' => $isValidatedOnlyView,
+        ]);
+    }
+
+    public function destroy(Request $request, DamageReport $report): RedirectResponse
     {
         // Delete associated images from storage
         foreach ($report->images as $image) {
@@ -71,7 +116,18 @@ class AffectedFamilyController extends Controller
         $report->delete();
 
         return redirect()
-            ->route('affected-families.index')
+            ->route(
+                $request->filled('barangay_id') ? 'affected-families.show' : 'affected-families.index',
+                array_filter([
+                    'barangay' => $request->input('barangay_id'),
+                    'name' => $request->input('name'),
+                ], fn ($value) => filled($value))
+            )
             ->with('status', 'Report deleted successfully.');
+    }
+
+    protected function isDswdView(Request $request): bool
+    {
+        return (string) ($request->user()?->role?->role_name ?? '') === 'dswd';
     }
 }

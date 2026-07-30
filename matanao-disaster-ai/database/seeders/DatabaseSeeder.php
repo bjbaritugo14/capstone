@@ -12,10 +12,22 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $superAdminRole = Role::firstOrCreate(['role_name' => 'super_admin']);
         $adminRole = Role::firstOrCreate(['role_name' => 'admin']);
         $mdrrmoRole = Role::firstOrCreate(['role_name' => 'mdrrmo']);
         $validatorRole = Role::firstOrCreate(['role_name' => 'validator']);
         $dswdRole = Role::firstOrCreate(['role_name' => 'dswd']);
+        $fieldOfficerRole = Role::firstOrCreate(['role_name' => 'field_officer']);
+
+        User::firstOrCreate(
+            ['email' => 'superadmin@example.com'],
+            [
+                'role_id' => $superAdminRole->role_id,
+                'full_name' => 'Super Administrator',
+                'password' => Hash::make('password'),
+                'status' => 'active',
+            ],
+        );
 
         User::firstOrCreate(
             ['email' => 'admin@example.com'],
@@ -52,6 +64,16 @@ class DatabaseSeeder extends Seeder
             [
                 'role_id' => $dswdRole->role_id,
                 'full_name' => 'DSWD Officer',
+                'password' => Hash::make('password'),
+                'status' => 'active',
+            ],
+        );
+
+        User::firstOrCreate(
+            ['email' => 'field@example.com'],
+            [
+                'role_id' => $fieldOfficerRole->role_id,
+                'full_name' => 'Field Officer',
                 'password' => Hash::make('password'),
                 'status' => 'active',
             ],

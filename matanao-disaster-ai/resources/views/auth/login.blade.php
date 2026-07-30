@@ -27,7 +27,7 @@
                 </div>
                 <div class="feature-card">
                     <strong>Decision Support</strong>
-                    <p>Sample recommendations for cash assistance, food packs, and medicines.</p>
+                    <p>Decision Tree-based recommendations for cash assistance, food packs, and medicines.</p>
                 </div>
             </div>
         </div>
@@ -69,8 +69,12 @@
                     <strong>Dashboard, records, recommendations, accidents, and validation</strong>
                 </div>
                 <div>
+                    <span>Validator</span>
+                    <strong>Browser-based disaster and accident reporting when Expo is unavailable</strong>
+                </div>
+                <div>
                     <span>Super Admin</span>
-                    <strong>User roles and study setup pages</strong>
+                    <strong>User roles, barangay options, and system settings</strong>
                 </div>
             </div>
         </div>

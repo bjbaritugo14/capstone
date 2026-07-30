@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\AccidentController;
+use App\Http\Controllers\AdminAuditTrailController;
 use App\Http\Controllers\AdminIncidentManagementController;
 use App\Http\Controllers\AdminRecommendationHistoryController;
 use App\Http\Controllers\AffectedFamilyController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SystemSettingsController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ValidationController;
+use App\Http\Controllers\ValidatorDashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('login'));
@@ -35,6 +37,12 @@ Route::middleware('role:mdrrmo')->group(function () {
     Route::post('/reports', [ReportController::class, 'store'])->name('reports.store');
     Route::get('/accidents', [AccidentController::class, 'index'])->name('accidents.index');
     Route::post('/accidents', [AccidentController::class, 'store'])->name('accidents.store');
+    Route::get('/recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
+    Route::post('/recommendations/reports/{report}', [RecommendationController::class, 'generate'])->name('recommendations.generate');
+    Route::delete('/affected-families/{report}', [AffectedFamilyController::class, 'destroy'])->name('affected-families.destroy');
+});
+
+Route::middleware('role:mdrrmo,validator')->group(function () {
     Route::get('/validation', [ValidationController::class, 'index'])->name('validation.index');
     Route::get('/validation/report/{report}', [ValidationController::class, 'showReport'])->name('validation.show-report');
     Route::post('/validation/report/{report}/validate', [ValidationController::class, 'validateReport'])->name('validation.validate-report');
@@ -46,12 +54,19 @@ Route::middleware('role:mdrrmo')->group(function () {
 
 Route::middleware('role:mdrrmo,dswd')->group(function () {
     Route::get('/affected-families', [AffectedFamilyController::class, 'index'])->name('affected-families.index');
-    Route::delete('/affected-families/{report}', [AffectedFamilyController::class, 'destroy'])->name('affected-families.destroy');
+    Route::get('/affected-families/{barangay}', [AffectedFamilyController::class, 'show'])->name('affected-families.show');
 });
 
 Route::prefix('dswd')->middleware('role:dswd')->group(function () {
     Route::get('/dashboard', [DswdDashboardController::class, 'index'])->name('dswd.dashboard');
+    Route::get('/validated-areas', [DswdDashboardController::class, 'validatedAreas'])->name('dswd.validated-areas');
     Route::get('/recommendations', [DswdRecommendationController::class, 'index'])->name('dswd.recommendations');
+});
+
+Route::prefix('field-officer')->middleware('role:field_officer')->group(function () {
+    Route::get('/dashboard', [ValidatorDashboardController::class, 'index'])->name('field-officer.dashboard');
+    Route::post('/reports', [ValidatorDashboardController::class, 'storeReport'])->name('field-officer.reports.store');
+    Route::post('/accidents', [ValidatorDashboardController::class, 'storeAccident'])->name('field-officer.accidents.store');
 });
 
 Route::prefix('admin')->middleware('role:super_admin,admin')->group(function () {
@@ -64,8 +79,13 @@ Route::prefix('admin')->middleware('role:super_admin,admin')->group(function () 
     Route::put('/incident-management/accidents/{accident}', [AdminIncidentManagementController::class, 'updateAccident'])->name('admin.incident-management.accidents.update');
     Route::post('/incident-management/reports/{report}/archive', [AdminIncidentManagementController::class, 'archiveReport'])->name('admin.incident-management.reports.archive');
     Route::post('/incident-management/accidents/{accident}/archive', [AdminIncidentManagementController::class, 'archiveAccident'])->name('admin.incident-management.accidents.archive');
-    Route::get('/recommendations', [RecommendationController::class, 'index'])->name('admin.recommendations.index');
-    Route::post('/recommendations/reports/{report}', [RecommendationController::class, 'generate'])->name('admin.recommendations.generate');
     Route::get('/recommendation-history', [AdminRecommendationHistoryController::class, 'index'])->name('admin.recommendation-history');
+    Route::get('/audit-trail', [AdminAuditTrailController::class, 'index'])->name('admin.audit-trail');
     Route::get('/settings', [SystemSettingsController::class, 'index'])->name('admin.settings');
+    Route::get('/settings/recommendations', [SystemSettingsController::class, 'showRecommendations'])->name('admin.settings.recommendations');
+    Route::get('/settings/barangays/create', [SystemSettingsController::class, 'createBarangay'])->name('admin.settings.barangays.create');
+    Route::get('/settings/barangays/{barangay}', [SystemSettingsController::class, 'showBarangay'])->name('admin.settings.barangays.show');
+    Route::put('/settings', [SystemSettingsController::class, 'update'])->name('admin.settings.update');
+    Route::post('/settings/barangays', [SystemSettingsController::class, 'storeBarangay'])->name('admin.settings.barangays.store');
+    Route::put('/settings/barangays/{barangay}', [SystemSettingsController::class, 'updateBarangay'])->name('admin.settings.barangays.update');
 });

@@ -16,28 +16,33 @@ class AdminRecommendationHistoryController extends Controller
             ->get()
             ->map(function (ResourceRecommendation $recommendation) {
                 $report = $recommendation->report;
-                $families = $report?->affectedFamilyRecords->count() ?: ($report?->affected_families ?? 0);
-                $members = $report?->affectedFamilyRecords->sum('household_members') ?: ($families * 4);
-                $severity = $report?->damage_severity ?? 'minor';
+                $snapshot = $recommendation->input_snapshot ?? [];
+                $families = (int) ($snapshot['affected_families'] ?? ($report?->affectedFamilyRecords->count() ?: ($report?->affected_families ?? 0)));
+                $members = (int) ($snapshot['household_members'] ?? ($report?->affectedFamilyRecords->sum('household_members') ?: ($families * 4)));
+                $structures = (int) ($snapshot['affected_structures'] ?? ($report?->affected_structures ?? 0));
+                $severity = (string) ($snapshot['damage_severity'] ?? ($report?->damage_severity ?? 'minor'));
+                $priority = ucfirst((string) ($snapshot['priority'] ?? strtolower($this->priority($severity))));
+                $signals = (array) ($snapshot['context_signals'] ?? []);
 
                 return [
                     'id' => 'REC-'.str_pad((string) $recommendation->recommendation_id, 4, '0', STR_PAD_LEFT),
                     'report' => 'REP-'.str_pad((string) $recommendation->report_id, 4, '0', STR_PAD_LEFT),
                     'barangay' => $recommendation->barangay?->barangay_name ?? 'Unassigned',
                     'disaster_type' => $report?->disaster_type ?? 'Unknown',
-                    'severity' => $this->priority($severity),
+                    'severity' => $priority,
                     'status' => ucfirst($report?->status ?? 'pending'),
                     'families' => $families,
                     'members' => $members,
-                    'structures' => $report?->affected_structures ?? 0,
+                    'structures' => $structures,
                     'food_packs' => $recommendation->food_packs,
                     'medicine_kits' => $recommendation->medicine_kits,
                     'cash_assistance' => $recommendation->cash_assistance,
                     'generated_by' => $recommendation->generator?->full_name ?? 'Unknown user',
                     'generated_at' => $recommendation->generated_at,
-                    'rule_trigger' => $this->ruleTrigger($severity, $families, $members, $report?->affected_structures ?? 0),
+                    'rule_trigger' => $this->ruleTrigger($severity, $families, $members, $structures, $signals),
                     'output_summary' => $this->outputSummary($recommendation->food_packs, $recommendation->medicine_kits, $recommendation->cash_assistance),
-                    'basis' => $this->basis($severity, $families, $report?->affected_structures ?? 0),
+                    'basis' => $recommendation->basis ?: $this->basis($severity, $families, $structures),
+                    'source' => $recommendation->source ?: 'decision_tree',
                 ];
             })
             ->values()
@@ -71,13 +76,15 @@ class AdminRecommendationHistoryController extends Controller
         };
     }
 
-    protected function ruleTrigger(?string $severity, int $families, int $members, int $structures): string
+    protected function ruleTrigger(?string $severity, int $families, int $members, int $structures, array $signals = []): string
     {
-        return match ($severity) {
+        $trigger = match ($severity) {
             'severe' => "Triggered severe rule: {$families} families, {$members} household members, {$structures} structures affected.",
             'moderate' => "Triggered moderate rule: {$families} families, {$members} household members, {$structures} structures affected.",
             default => "Triggered minor rule: {$families} families, {$members} household members, {$structures} structures affected.",
         };
+
+        return $signals === [] ? $trigger : $trigger.' Context: '.implode('; ', $signals).'.';
     }
 
     protected function outputSummary(int $foodPacks, int $medicineKits, float $cashAssistance): string

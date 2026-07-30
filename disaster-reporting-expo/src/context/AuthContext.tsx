@@ -23,6 +23,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isAuthenticated: Boolean(token),
       login: async (email: string, password: string) => {
         const response = await api.login(email, password);
+
+        if (response.user.role !== 'field_officer') {
+          await api.logout(response.token).catch(() => undefined);
+          throw new Error('This mobile application is available only to Field Officer accounts.');
+        }
+
         setToken(response.token);
         setUser(response.user);
       },

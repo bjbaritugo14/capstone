@@ -52,6 +52,8 @@ export default function ProfileScreen() {
           <Text style={styles.value}>{user?.name}</Text>
           <Text style={styles.label}>Email</Text>
           <Text style={styles.value}>{user?.email}</Text>
+          <Text style={styles.label}>Role</Text>
+          <Text style={styles.value}>Field Officer</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Change password</Text>

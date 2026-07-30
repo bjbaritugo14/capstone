@@ -15,6 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVehicularAccidents } from '../../src/context/VehicularAccidentContext';
 import { VehicularAccident } from '../../src/types';
 
+function formatStatus(status?: VehicularAccident['status']) {
+  return (status ?? 'recorded').replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function hasCoordinates(latitude?: string, longitude?: string) {
+  return Boolean(latitude && longitude && latitude !== '0' && longitude !== '0');
+}
+
 export default function VehicularAccidentsScreen() {
   const router = useRouter();
   const { accidents, loading, refreshAccidents, deleteAccident } = useVehicularAccidents();
@@ -32,6 +40,7 @@ export default function VehicularAccidentsScreen() {
         accident.accidentType ?? '',
         accident.description ?? '',
         accident.status ?? '',
+        accident.validationRemarks ?? '',
       ]
         .join(' ')
         .toLowerCase()
@@ -64,13 +73,13 @@ export default function VehicularAccidentsScreen() {
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>Vehicular accident records</Text>
               <Text style={styles.statValue}>{accidents.length}</Text>
-              <Text style={styles.statHelper}>Submit, search, edit, and delete accident reports.</Text>
+              <Text style={styles.statHelper}>Submit, track validation status, revise returned reports, and delete accident records.</Text>
             </View>
 
             <View style={styles.toolbar}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search by place, type, status, or description"
+                placeholder="Search by place, type, status, or remarks"
                 value={search}
                 onChangeText={setSearch}
               />
@@ -86,11 +95,22 @@ export default function VehicularAccidentsScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>{item.accidentType ?? 'Unknown'}</Text>
-              <Text style={styles.badge}>{item.status ?? '-'}</Text>
+              <Text
+                style={[
+                  styles.badge,
+                  item.status === 'returned'
+                    ? styles.badgeReturned
+                    : item.status === 'validated'
+                      ? styles.badgeValidated
+                      : styles.badgeRecorded,
+                ]}
+              >
+                {formatStatus(item.status)}
+              </Text>
             </View>
 
             <Text style={styles.cardMeta}>
-              {item.barangay ?? ''} • {item.purok ?? ''}
+              {item.barangay ?? ''} | {item.purok ?? ''}
             </Text>
             <Text style={styles.cardMeta}>Person involved: {item.personName || 'Not specified'}</Text>
             <Text style={styles.cardMeta}>
@@ -99,8 +119,21 @@ export default function VehicularAccidentsScreen() {
             <Text style={styles.description}>{item.description ?? ''}</Text>
             <Text style={styles.cardMeta}>Incident date: {item.incidentDate ?? '-'}</Text>
             <Text style={styles.cardMeta}>
-              GPS: {item.latitude ?? '-'}, {item.longitude ?? '-'}
+              GPS: {hasCoordinates(item.latitude, item.longitude) ? `${item.latitude}, ${item.longitude}` : 'No GPS captured'}
             </Text>
+            {item.validationRemarks ? (
+              <View
+                style={[
+                  styles.feedbackBox,
+                  item.status === 'returned' ? styles.feedbackReturned : styles.feedbackNeutral,
+                ]}
+              >
+                <Text style={styles.feedbackTitle}>
+                  {item.status === 'returned' ? 'Returned with remarks' : 'Validator remarks'}
+                </Text>
+                <Text style={styles.feedbackText}>{item.validationRemarks}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.actions}>
               <TouchableOpacity
@@ -210,13 +243,23 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   badge: {
-    color: '#047857',
-    backgroundColor: '#d1fae5',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
     fontSize: 12,
     fontWeight: '700',
+  },
+  badgeRecorded: {
+    color: '#0f766e',
+    backgroundColor: '#ccfbf1',
+  },
+  badgeValidated: {
+    color: '#166534',
+    backgroundColor: '#dcfce7',
+  },
+  badgeReturned: {
+    color: '#991b1b',
+    backgroundColor: '#fee2e2',
   },
   cardMeta: {
     fontSize: 13,
@@ -227,6 +270,31 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginVertical: 8,
     lineHeight: 20,
+  },
+  feedbackBox: {
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  feedbackNeutral: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  feedbackReturned: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  feedbackTitle: {
+    color: '#111827',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  feedbackText: {
+    color: '#374151',
+    lineHeight: 19,
   },
   actions: {
     flexDirection: 'row',

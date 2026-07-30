@@ -27,7 +27,7 @@ return new class extends Migration {
             $table->unsignedInteger('affected_families')->default(0);
             $table->unsignedInteger('affected_structures')->default(0);
             $table->dateTime('incident_datetime');
-            $table->enum('status', ['pending', 'validated', 'rejected'])->default('pending');
+            $table->enum('status', ['pending', 'validated', 'rejected', 'returned'])->default('pending');
             $table->timestamp('created_at')->useCurrent();
         });
     }

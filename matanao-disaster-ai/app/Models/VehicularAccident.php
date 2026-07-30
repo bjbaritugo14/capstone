@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VehicularAccident extends Model
 {
@@ -52,5 +53,10 @@ class VehicularAccident extends Model
     public function images(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(AccidentImage::class, 'accident_id', 'accident_id');
+    }
+
+    public function validations(): HasMany
+    {
+        return $this->hasMany(AccidentValidation::class, 'accident_id', 'accident_id');
     }
 }

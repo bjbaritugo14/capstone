@@ -22,7 +22,7 @@ return new class extends Migration {
                 ->constrained('users', 'user_id')
                 ->restrictOnDelete()
                 ->cascadeOnUpdate();
-            $table->enum('validation_status', ['validated', 'rejected']);
+            $table->enum('validation_status', ['validated', 'rejected', 'returned']);
             $table->text('remarks')->nullable();
             $table->timestamp('validated_at')->useCurrent();
         });

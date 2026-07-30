@@ -1,6 +1,6 @@
 # Recommendation Algorithm
 
-The recommendation module uses a Decision Tree as the main algorithm and Ollama as a local AI assistance layer.
+The recommendation module uses a Decision Tree as the main algorithm and Ollama as an optional local AI assistance layer.
 
 ## Inputs
 
@@ -36,11 +36,22 @@ The recommendation module uses a Decision Tree as the main algorithm and Ollama 
    - Medicine kits use the lowest multiplier
    - Cash assistance uses the lowest multiplier
 
+4. Family and structure totals are compared with the configured focused and immediate response thresholds.
+
+5. Disaster type and description are processed through predefined contextual branches:
+   - Flood and typhoon reports modestly increase food-pack planning.
+   - Earthquake, landslide, and fire reports modestly increase medical-kit readiness.
+   - Evacuation, medical, and major structural-damage terms apply the matching contextual adjustment.
+
+Barangay does not change assistance quantities by itself. It is included in the recommendation basis and stored input snapshot so users can identify where the decision-support output applies without assigning unequal rates solely by location.
+
 ## Ollama Use
 
 Ollama is not trained from scratch in this project. The system sends structured disaster data and the Decision Tree baseline to Ollama through a prompt. Ollama returns JSON with food packs, medicine kits, cash assistance, and explanation.
 
 If Ollama is unavailable or returns invalid JSON, the system still generates a recommendation using the Decision Tree service.
+
+Every generated recommendation stores its basis, source, and input snapshot for recommendation history and DSWD review.
 
 ## Code Location
 

@@ -6,13 +6,19 @@ use App\Models\DamageReport;
 use App\Models\AffectedFamily;
 use App\Models\Barangay;
 use App\Models\IncidentLocation;
+use App\Services\SystemSettingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ReportController extends Controller
 {
+    public function __construct(
+        protected SystemSettingService $settings,
+    ) {}
+
     protected function reports(): array
     {
         return DamageReport::query()
@@ -33,8 +39,8 @@ class ReportController extends Controller
                 'status' => ucfirst($report->status),
                 'submitted_by' => $report->user?->full_name ?? 'Unknown user',
                 'coordinates' => $this->coordinates($report->location?->latitude, $report->location?->longitude),
-                'latitude' => $report->location?->latitude === null ? null : (float) $report->location->latitude,
-                'longitude' => $report->location?->longitude === null ? null : (float) $report->location->longitude,
+                'latitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->latitude : null,
+                'longitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->longitude : null,
                 'date' => optional($report->incident_datetime)->format('Y-m-d') ?? '',
                 'time' => optional($report->incident_datetime)->format('h:i A') ?? '',
                 'needs' => $this->needs($report),
@@ -46,7 +52,7 @@ class ReportController extends Controller
     public function index(): View
     {
         $reports = $this->reports();
-        $barangays = Barangay::orderBy('barangay_name')->get();
+        $barangays = Barangay::query()->active()->orderBy('barangay_name')->get();
 
         $stats = [
             'total' => count($reports),
@@ -135,7 +141,7 @@ class ReportController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'barangay_id' => ['required', 'exists:barangays,barangay_id'],
+            'barangay_id' => ['required', Rule::exists('barangays', 'barangay_id')->where('status', 'active')],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'road_segment' => ['nullable', 'string', 'max:150'],
@@ -213,11 +219,20 @@ class ReportController extends Controller
 
     protected function coordinates(mixed $latitude, mixed $longitude): string
     {
-        if ($latitude === null || $longitude === null) {
+        if (! $this->hasCoordinates($latitude, $longitude)) {
             return 'No coordinates';
         }
 
         return $latitude.', '.$longitude;
+    }
+
+    protected function hasCoordinates(mixed $latitude, mixed $longitude): bool
+    {
+        if (! is_numeric($latitude) || ! is_numeric($longitude)) {
+            return false;
+        }
+
+        return ! ((float) $latitude === 0.0 && (float) $longitude === 0.0);
     }
 
     protected function needs(DamageReport $report): string
@@ -261,11 +276,19 @@ class ReportController extends Controller
 
     protected function impactPriority(int $families, int $structures, string $severity): string
     {
-        if ($severity === 'High' || $families >= 100 || $structures >= 50) {
+        if (
+            $severity === 'High'
+            || $families >= $this->settings->integer('impact_immediate_family_threshold')
+            || $structures >= $this->settings->integer('impact_immediate_structure_threshold')
+        ) {
             return 'Immediate response';
         }
 
-        if ($severity === 'Medium' || $families >= 30 || $structures >= 15) {
+        if (
+            $severity === 'Medium'
+            || $families >= $this->settings->integer('impact_focused_family_threshold')
+            || $structures >= $this->settings->integer('impact_focused_structure_threshold')
+        ) {
             return 'Focused validation';
         }
 

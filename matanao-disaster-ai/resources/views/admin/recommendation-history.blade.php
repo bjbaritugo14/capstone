@@ -5,7 +5,7 @@
     <div>
         <div class="pill">Admin Oversight</div>
         <h1>Recommendation History</h1>
-        <p class="muted">View all generated recommendations, track triggered rules, and review past decision-support outputs.</p>
+        <p class="muted">View all Decision Tree-based recommendations, track triggered rules, and review past decision-support outputs.</p>
     </div>
 </div>
 
@@ -33,7 +33,7 @@
         <div class="section-heading">
             <div>
                 <h2>Generated Recommendation Outputs</h2>
-                <p class="muted">Audit view of all decision-support outputs generated for disaster reports.</p>
+                <p class="muted">Audit view of all recommendation outputs generated for validated disaster reports.</p>
             </div>
         </div>
 
@@ -79,7 +79,7 @@
         <div class="section-heading">
             <div>
                 <h2>Triggered Rule Reference</h2>
-                <p class="muted">Decision Tree rules used as the basis for recommendation generation.</p>
+                <p class="muted">Decision Tree rules used as the primary basis for recommendation generation, with optional Ollama-assisted refinement.</p>
             </div>
         </div>
 
@@ -103,7 +103,7 @@
     <div class="section-heading">
         <div>
             <h2>Decision-Support History Review</h2>
-            <p class="muted">Past outputs with report context, triggered rule summary, and generation details.</p>
+            <p class="muted">Past outputs with report context, triggered rule summary, and generation details for audit and review.</p>
         </div>
     </div>
 
@@ -130,8 +130,8 @@
             </div>
         @empty
             <div class="stack-item">
-                <strong>No decision-support outputs yet.</strong>
-                <p class="muted">Generated recommendations will appear here for admin review.</p>
+                <strong>No recommendation outputs yet.</strong>
+                <p class="muted">Generated Decision Tree recommendations will appear here for admin review.</p>
             </div>
         @endforelse
     </div>

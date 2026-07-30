@@ -1,5 +1,5 @@
 import { mockApi } from '../mocks/mockApi';
-import { Report, ReportPayload, User, VehicularAccident, VehicularAccidentPayload } from '../types';
+import { BarangayOption, Report, ReportPayload, User, VehicularAccident, VehicularAccidentPayload } from '../types';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://192.168.1.50:8000/api';
 const USE_MOCK_API = false; // Hardcoded to use real API
@@ -84,6 +84,21 @@ export const api = {
 
     const list = Array.isArray(data) ? data : data.data ?? [];
     return list.filter((item) => item && item.id != null);
+  },
+
+  async getBarangays(token?: string): Promise<BarangayOption[]> {
+    if (USE_MOCK_API) {
+      return [];
+    }
+
+    const data = await request<BarangayOption[] | { data: BarangayOption[] }>('/barangays', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const list = Array.isArray(data) ? data : data.data ?? [];
+    return list.filter((item) => item && item.id != null && item.name);
   },
 
   async createReport(payload: ReportPayload, token?: string): Promise<Report> {

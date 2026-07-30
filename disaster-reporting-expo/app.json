@@ -25,7 +25,8 @@
         {
           "locationWhenInUsePermission": "Allow Disaster Reporting to access your location so it can attach GPS coordinates to your report."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

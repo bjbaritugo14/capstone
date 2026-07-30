@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Builder;
 
 class Barangay extends Model
 {
@@ -19,7 +20,13 @@ class Barangay extends Model
         'barangay_name',
         'municipality',
         'province',
+        'status',
     ];
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', 'active');
+    }
 
     public function damageReports(): HasManyThrough
     {

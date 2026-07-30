@@ -12,6 +12,7 @@ class RecommendationController extends Controller
     {
         $recommendations = ResourceRecommendation::query()
             ->with(['barangay', 'report'])
+            ->whereHas('report', fn ($query) => $query->where('status', 'validated'))
             ->latest('generated_at')
             ->get()
             ->map(fn (ResourceRecommendation $recommendation) => [
@@ -21,6 +22,9 @@ class RecommendationController extends Controller
                 'food_packs' => $recommendation->food_packs,
                 'medical_kits' => $recommendation->medicine_kits,
                 'cash_assistance' => $recommendation->cash_assistance,
+                'basis' => $recommendation->basis,
+                'source' => $recommendation->source,
+                'inputs' => $recommendation->input_snapshot,
                 'priority_level' => match ($recommendation->report?->damage_severity) {
                     'severe' => 'High',
                     'moderate' => 'Medium',

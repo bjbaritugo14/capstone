@@ -54,6 +54,43 @@
             <div id="accident-map" class="map-canvas" aria-label="Vehicular accident map"></div>
         </div>
     </section>
+</div>
+
+<div class="content-grid two-columns top-gap">
+    <section class="card">
+        <div class="section-heading">
+            <div>
+                <h2>Accidents Per Barangay</h2>
+                <p class="muted">Dedicated summary of recorded vehicular accidents per barangay across Matanao.</p>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Barangay</th>
+                        <th>Total Accidents</th>
+                        <th>High Severity</th>
+                        <th>Trend</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($barangaySummaries as $summary)
+                        <tr>
+                            <td>{{ $summary['barangay'] }}</td>
+                            <td>{{ $summary['incidents'] }}</td>
+                            <td>{{ $summary['high_severity'] }}</td>
+                            <td>{{ $summary['trend'] }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4">No barangay accident summary available.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
 
     <section class="card">
         <div class="section-heading">
@@ -147,7 +184,7 @@
 
     const map = L.map('accident-map', {
         zoomControl: true,
-        scrollWheelZoom: false,
+        scrollWheelZoom: true,
     }).setView([mapCenter.lat, mapCenter.lng], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

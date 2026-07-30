@@ -8,6 +8,7 @@ use App\Models\IncidentLocation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class AccidentController extends Controller
@@ -28,7 +29,9 @@ class AccidentController extends Controller
                 'time' => optional($accident->incident_datetime)->format('h:i A') ?? '',
                 'date' => optional($accident->incident_datetime)->format('Y-m-d') ?? '',
                 'status' => ucfirst($accident->status),
-                'coordinates' => $accident->location?->latitude.', '.$accident->location?->longitude,
+                'coordinates' => $this->coordinates($accident->location?->latitude, $accident->location?->longitude),
+                'latitude' => $this->hasCoordinates($accident->location?->latitude, $accident->location?->longitude) ? (float) $accident->location->latitude : null,
+                'longitude' => $this->hasCoordinates($accident->location?->latitude, $accident->location?->longitude) ? (float) $accident->location->longitude : null,
                 'severity' => $this->severity($accident),
             ])
             ->all();
@@ -55,10 +58,24 @@ class AccidentController extends Controller
             ->values()
             ->all();
 
+        $barangaySummaries = collect($accidents)
+            ->groupBy('barangay')
+            ->map(fn ($items, $barangay) => [
+                'barangay' => $barangay,
+                'incidents' => $items->count(),
+                'high_severity' => $items->where('severity', 'High')->count(),
+                'trend' => $items->count() >= 5 ? 'High' : ($items->count() >= 2 ? 'Medium' : 'Low'),
+            ])
+            ->sortByDesc('incidents')
+            ->values()
+            ->all();
+
         $mapCenter = ['lat' => 6.688099, 'lng' => 125.166607];
 
-        $mapPoints = array_map(function (array $accident) {
-            [$lat, $lng] = array_map('trim', explode(',', $accident['coordinates']));
+        $mapPoints = array_values(array_filter(array_map(function (array $accident) {
+            if ($accident['latitude'] === null || $accident['longitude'] === null) {
+                return null;
+            }
 
             return [
                 'id' => $accident['id'],
@@ -67,20 +84,20 @@ class AccidentController extends Controller
                 'incident_type' => $accident['incident_type'],
                 'status' => $accident['status'],
                 'severity' => $accident['severity'],
-                'lat' => (float) $lat,
-                'lng' => (float) $lng,
+                'lat' => $accident['latitude'],
+                'lng' => $accident['longitude'],
             ];
-        }, $accidents);
+        }, $accidents)));
 
-        $barangays = Barangay::orderBy('barangay_name')->get();
+        $barangays = Barangay::query()->active()->orderBy('barangay_name')->get();
 
-        return view('accidents.index', compact('accidents', 'stats', 'hotspots', 'mapCenter', 'mapPoints', 'barangays'));
+        return view('accidents.index', compact('accidents', 'stats', 'hotspots', 'barangaySummaries', 'mapCenter', 'mapPoints', 'barangays'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'barangay_id' => ['required', 'exists:barangays,barangay_id'],
+            'barangay_id' => ['required', Rule::exists('barangays', 'barangay_id')->where('status', 'active')],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'road_segment' => ['nullable', 'string', 'max:150'],
@@ -131,5 +148,23 @@ class AccidentController extends Controller
         }
 
         return 'Low';
+    }
+
+    protected function hasCoordinates(mixed $latitude, mixed $longitude): bool
+    {
+        if (! is_numeric($latitude) || ! is_numeric($longitude)) {
+            return false;
+        }
+
+        return ! ((float) $latitude === 0.0 && (float) $longitude === 0.0);
+    }
+
+    protected function coordinates(mixed $latitude, mixed $longitude): string
+    {
+        if (! $this->hasCoordinates($latitude, $longitude)) {
+            return 'No GPS coordinates';
+        }
+
+        return $latitude.', '.$longitude;
     }
 }

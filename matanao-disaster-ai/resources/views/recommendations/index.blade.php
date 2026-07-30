@@ -3,9 +3,9 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">AI Recommendation Module</div>
+        <div class="pill">Decision Tree Recommendation Module</div>
         <h1>Assistance Recommendations</h1>
-        <p class="muted">Ollama-assisted recommendation outputs for cash assistance, food packs, and medicine.</p>
+        <p class="muted">Decision Tree-based recommendation outputs for cash assistance, food packs, and medicine, with optional Ollama-assisted refinement.</p>
     </div>
 </div>
 
@@ -57,8 +57,8 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Generate With Ollama</h2>
-                <p class="muted">Create AI-assisted recommendations from disaster reports that do not have recommendations yet.</p>
+                <h2>Generate Recommendation</h2>
+                <p class="muted">Create Decision Tree recommendations for validated disaster reports. Ollama may assist with contextual refinement when available.</p>
             </div>
         </div>
 
@@ -72,7 +72,7 @@
                     <p class="muted">{{ $report->disaster_type }} | {{ $report->affectedFamilyRecords->count() ?: $report->affected_families }} families | {{ $report->affected_structures }} structures</p>
                     <form method="POST" action="{{ route('recommendations.generate', $report) }}" class="inline-form">
                         @csrf
-                        <button type="submit" class="btn btn-primary">Generate AI Recommendation</button>
+                        <button type="submit" class="btn btn-primary">Generate Decision Tree Recommendation</button>
                     </form>
                 </div>
             @empty

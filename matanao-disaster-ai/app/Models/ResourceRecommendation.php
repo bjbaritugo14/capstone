@@ -24,8 +24,20 @@ class ResourceRecommendation extends Model
         'cash_assistance',
         'food_packs',
         'medicine_kits',
+        'basis',
+        'source',
+        'input_snapshot',
         'generated_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'cash_assistance' => 'float',
+            'input_snapshot' => 'array',
+            'generated_at' => 'datetime',
+        ];
+    }
 
     public function report(): BelongsTo
     {

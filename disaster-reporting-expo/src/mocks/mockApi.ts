@@ -6,6 +6,7 @@ const mockUser: User = {
   id: 1,
   name: 'Demo Responder',
   email: 'demo@example.com',
+  role: 'field_officer',
 };
 
 let mockReports: Report[] = [
@@ -25,6 +26,10 @@ let mockReports: Report[] = [
     longitude: '125.2321',
     latitude: '6.6798',
     reportDate: '2026-03-22',
+    status: 'validated',
+    validationRemarks: 'Validated by MDRRMO.',
+    validatedAt: new Date().toISOString(),
+    validatedBy: 'MDRRMO Validator',
     createdAt: new Date().toISOString(),
   },
   {
@@ -44,6 +49,10 @@ let mockReports: Report[] = [
     longitude: '125.2200',
     latitude: '6.6900',
     reportDate: '2026-03-21',
+    status: 'returned',
+    validationRemarks: 'Please update the family damage details and capture clearer GPS coordinates.',
+    validatedAt: new Date().toISOString(),
+    validatedBy: 'MDRRMO Validator',
     createdAt: new Date().toISOString(),
   },
 ];
@@ -64,10 +73,14 @@ let mockVehicularAccidents: VehicularAccident[] = [
     involvedPersons: [
       { personName: 'Juan Dela Cruz', role: 'Driver', contactNumber: '09171234567' },
     ],
+    photos: [],
     longitude: '125.232100',
     latitude: '6.679800',
     incidentDate: '2026-05-06',
     status: 'recorded',
+    validationRemarks: '',
+    validatedAt: '',
+    validatedBy: '',
     createdAt: new Date().toISOString(),
   },
 ];
@@ -99,6 +112,10 @@ export const mockApi = {
     const newReport: Report = {
       ...payload,
       id: Date.now(),
+      status: 'pending',
+      validationRemarks: '',
+      validatedAt: '',
+      validatedBy: '',
       createdAt: new Date().toISOString(),
     };
     mockReports = [newReport, ...mockReports];
@@ -107,9 +124,18 @@ export const mockApi = {
 
   async updateReport(id: number, payload: ReportPayload) {
     await sleep();
-    mockReports = mockReports.map((report) =>
-      report.id === id ? { ...report, ...payload } : report
-    );
+    mockReports = mockReports.map((report) => {
+      if (report.id !== id) {
+        return report;
+      }
+
+      return {
+        ...report,
+        ...payload,
+        status: report.status === 'returned' ? 'pending' : report.status,
+      };
+    });
+
     const updated = mockReports.find((report) => report.id === id);
     if (!updated) throw new Error('Report not found.');
     return updated;
@@ -140,6 +166,9 @@ export const mockApi = {
       ...payload,
       id: Date.now(),
       status: 'recorded',
+      validationRemarks: '',
+      validatedAt: '',
+      validatedBy: '',
       createdAt: new Date().toISOString(),
     };
     mockVehicularAccidents = [newAccident, ...mockVehicularAccidents];
@@ -148,9 +177,18 @@ export const mockApi = {
 
   async updateVehicularAccident(id: number, payload: VehicularAccidentPayload) {
     await sleep();
-    mockVehicularAccidents = mockVehicularAccidents.map((accident) =>
-      accident.id === id ? { ...accident, ...payload } : accident
-    );
+    mockVehicularAccidents = mockVehicularAccidents.map((accident) => {
+      if (accident.id !== id) {
+        return accident;
+      }
+
+      return {
+        ...accident,
+        ...payload,
+        status: accident.status === 'returned' ? 'recorded' : accident.status,
+      };
+    });
+
     const updated = mockVehicularAccidents.find((accident) => accident.id === id);
     if (!updated) throw new Error('Accident report not found.');
     return updated;

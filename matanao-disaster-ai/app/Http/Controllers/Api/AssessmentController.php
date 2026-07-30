@@ -7,6 +7,7 @@ use App\Models\DamageReport;
 use App\Models\IncidentLocation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AssessmentController extends Controller
 {
@@ -47,7 +48,7 @@ class AssessmentController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'barangay_id' => ['required', 'exists:barangays,barangay_id'],
+            'barangay_id' => ['required', Rule::exists('barangays', 'barangay_id')->where('status', 'active')],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'road_segment' => ['nullable', 'string', 'max:150'],

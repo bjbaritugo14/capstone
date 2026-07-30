@@ -55,7 +55,9 @@ class DashboardController extends Controller
                 'barangay' => $report->location?->barangay?->barangay_name ?? 'Unassigned',
                 'severity' => $this->severityLabel($report->damage_severity),
                 'status' => ucfirst($report->status),
-                'coordinates' => $report->location?->latitude.', '.$report->location?->longitude,
+                'coordinates' => $this->coordinates($report->location?->latitude, $report->location?->longitude),
+                'lat' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->latitude : null,
+                'lng' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->longitude : null,
                 'incident_type' => 'Disaster Report',
                 'sort_date' => $report->incident_datetime,
             ]);
@@ -68,7 +70,9 @@ class DashboardController extends Controller
                 'barangay' => $accident->location?->barangay?->barangay_name ?? 'Unassigned',
                 'severity' => $accident->fatality_count > 0 || $accident->injured_count >= 3 ? 'High' : ($accident->injured_count > 0 ? 'Medium' : 'Low'),
                 'status' => ucfirst($accident->status),
-                'coordinates' => $accident->location?->latitude.', '.$accident->location?->longitude,
+                'coordinates' => $this->coordinates($accident->location?->latitude, $accident->location?->longitude),
+                'lat' => $this->hasCoordinates($accident->location?->latitude, $accident->location?->longitude) ? (float) $accident->location->latitude : null,
+                'lng' => $this->hasCoordinates($accident->location?->latitude, $accident->location?->longitude) ? (float) $accident->location->longitude : null,
                 'incident_type' => 'Vehicular Accident',
                 'sort_date' => $accident->incident_datetime,
             ]);
@@ -100,8 +104,10 @@ class DashboardController extends Controller
 
         $mapCenter = ['lat' => 6.688099, 'lng' => 125.166607];
 
-        $mapPoints = array_map(function (array $report) {
-            [$lat, $lng] = array_map('trim', explode(',', $report['coordinates']));
+        $mapPoints = array_values(array_filter(array_map(function (array $report) {
+            if ($report['lat'] === null || $report['lng'] === null) {
+                return null;
+            }
 
             return [
                 'code' => $report['code'],
@@ -109,10 +115,10 @@ class DashboardController extends Controller
                 'severity' => $report['severity'],
                 'status' => $report['status'],
                 'incident_type' => $report['incident_type'],
-                'lat' => (float) $lat,
-                'lng' => (float) $lng,
+                'lat' => $report['lat'],
+                'lng' => $report['lng'],
             ];
-        }, $recentReports);
+        }, $recentReports)));
 
         return view('dashboard', compact(
             'stats',
@@ -159,5 +165,23 @@ class DashboardController extends Controller
         }
 
         return 'Monitoring and reserve allocation';
+    }
+
+    protected function hasCoordinates(mixed $latitude, mixed $longitude): bool
+    {
+        if (! is_numeric($latitude) || ! is_numeric($longitude)) {
+            return false;
+        }
+
+        return ! ((float) $latitude === 0.0 && (float) $longitude === 0.0);
+    }
+
+    protected function coordinates(mixed $latitude, mixed $longitude): string
+    {
+        if (! $this->hasCoordinates($latitude, $longitude)) {
+            return 'No GPS coordinates';
+        }
+
+        return $latitude.', '.$longitude;
     }
 }

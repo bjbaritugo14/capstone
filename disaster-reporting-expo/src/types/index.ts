@@ -1,11 +1,22 @@
+export type UserRole = 'super_admin' | 'admin' | 'mdrrmo' | 'validator' | 'dswd' | 'field_officer';
+
 export type User = {
   id: number;
   name: string;
   email: string;
+  role: UserRole;
+};
+
+export type BarangayOption = {
+  id: number;
+  name: string;
+  municipality: string;
+  province: string;
 };
 
 export type DisasterType = 'Flood' | 'Typhoon' | 'Landslide' | 'Earthquake' | 'Fire' | 'Other';
 export type Severity = 'minor' | 'moderate' | 'severe';
+export type ReportStatus = 'pending' | 'validated' | 'returned' | 'rejected';
 
 export type AffectedFamily = {
   familyHeadName: string;
@@ -32,10 +43,14 @@ export type Report = {
   longitude: string;
   latitude: string;
   reportDate: string;
+  status: ReportStatus;
+  validationRemarks: string;
+  validatedAt: string;
+  validatedBy: string;
   createdAt: string;
 };
 
-export type ReportPayload = Omit<Report, 'id' | 'createdAt'>;
+export type ReportPayload = Omit<Report, 'id' | 'status' | 'validationRemarks' | 'validatedAt' | 'validatedBy' | 'createdAt'>;
 
 export const DISASTER_TYPES: DisasterType[] = ['Flood', 'Typhoon', 'Landslide', 'Earthquake', 'Fire', 'Other'];
 export const SEVERITY_LEVELS: Severity[] = ['minor', 'moderate', 'severe'];
@@ -75,7 +90,7 @@ export const MATANAO_BARANGAYS = [
   'Towak',
 ] as const;
 
-export type AccidentStatus = 'recorded' | 'verified' | 'closed';
+export type AccidentStatus = 'recorded' | 'validated' | 'returned' | 'verified' | 'closed';
 
 export type InvolvedPerson = {
   personName: string;
@@ -101,7 +116,10 @@ export type VehicularAccident = {
   latitude: string;
   incidentDate: string;
   status: AccidentStatus;
+  validationRemarks: string;
+  validatedAt: string;
+  validatedBy: string;
   createdAt: string;
 };
 
-export type VehicularAccidentPayload = Omit<VehicularAccident, 'id' | 'status' | 'createdAt'>;
+export type VehicularAccidentPayload = Omit<VehicularAccident, 'id' | 'status' | 'validationRemarks' | 'validatedAt' | 'validatedBy' | 'createdAt'>;

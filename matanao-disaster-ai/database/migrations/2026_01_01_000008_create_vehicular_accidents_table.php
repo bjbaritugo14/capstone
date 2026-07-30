@@ -27,7 +27,7 @@ return new class extends Migration {
             $table->unsignedInteger('injured_count')->default(0);
             $table->unsignedInteger('fatality_count')->default(0);
             $table->dateTime('incident_datetime');
-            $table->enum('status', ['recorded', 'verified', 'closed'])->default('recorded');
+            $table->enum('status', ['recorded', 'verified', 'closed', 'validated', 'returned'])->default('recorded');
             $table->timestamp('created_at')->useCurrent();
         });
     }

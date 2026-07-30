@@ -10,11 +10,16 @@ class OllamaRecommendationService
 {
     public function __construct(
         protected DecisionTreeRecommendationService $decisionTree,
+        protected SystemSettingService $settings,
     ) {}
 
     public function generate(DamageReport $report): array
     {
         $fallback = $this->decisionTree->generate($report);
+
+        if (! $this->settings->boolean('recommendation_use_ollama_assistance')) {
+            return [...$fallback, 'source' => 'decision_tree'];
+        }
 
         try {
             $response = Http::timeout((int) config('services.ollama.timeout', 30))
@@ -39,8 +44,9 @@ class OllamaRecommendationService
                 'food_packs' => max(0, (int) ($payload['food_packs'] ?? $fallback['food_packs'])),
                 'medicine_kits' => max(0, (int) ($payload['medicine_kits'] ?? $fallback['medicine_kits'])),
                 'cash_assistance' => max(0, (float) ($payload['cash_assistance'] ?? $fallback['cash_assistance'])),
-                'basis' => (string) ($payload['basis'] ?? $fallback['basis']),
+                'basis' => $fallback['basis'].' Ollama refinement: '.(string) ($payload['basis'] ?? 'No additional explanation provided.'),
                 'source' => 'ollama',
+                'inputs' => $fallback['inputs'],
             ];
         } catch (Throwable) {
             return [...$fallback, 'source' => 'decision_tree'];

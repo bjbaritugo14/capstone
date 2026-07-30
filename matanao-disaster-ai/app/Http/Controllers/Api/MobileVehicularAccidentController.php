@@ -5,19 +5,26 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AccidentImage;
 use App\Models\AccidentInvolvedPerson;
+use App\Models\AccidentValidation;
 use App\Models\Barangay;
 use App\Models\IncidentLocation;
 use App\Models\VehicularAccident;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class MobileVehicularAccidentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $accidents = VehicularAccident::query()
-            ->with(['location.barangay', 'involvedPersons', 'images'])
+            ->with([
+                'location.barangay',
+                'involvedPersons',
+                'images',
+                'validations' => fn ($query) => $query->with('validator')->latest('validated_at'),
+            ])
             ->where('user_id', $request->user()->user_id)
             ->latest('created_at')
             ->get()
@@ -74,7 +81,12 @@ class MobileVehicularAccidentController extends Controller
             }
         }
 
-        return response()->json($this->toMobile($accident->load(['location.barangay', 'involvedPersons', 'images'])), 201);
+        return response()->json($this->toMobile($accident->load([
+            'location.barangay',
+            'involvedPersons',
+            'images',
+            'validations' => fn ($query) => $query->with('validator')->latest('validated_at'),
+        ])), 201);
     }
 
     public function update(Request $request, VehicularAccident $vehicularAccident): JsonResponse
@@ -89,11 +101,15 @@ class MobileVehicularAccidentController extends Controller
 
         $validated = $this->validated($request);
         $barangay = $this->barangayFromPayload($validated);
+        $coordinates = $this->resolvedCoordinates(
+            $validated['latitude'] ?? null,
+            $validated['longitude'] ?? null,
+        );
 
         $vehicularAccident->location()->update([
             'barangay_id' => $barangay->barangay_id,
-            'latitude' => $validated['latitude'],
-            'longitude' => $validated['longitude'],
+            'latitude' => $coordinates['lat'],
+            'longitude' => $coordinates['lng'],
             'road_segment' => $validated['roadSegment'] ?? null,
             'sitio_purok' => $validated['purok'] ?? null,
         ]);
@@ -107,6 +123,7 @@ class MobileVehicularAccidentController extends Controller
             'injured_count' => $validated['injuredCount'] ?? 0,
             'fatality_count' => $validated['fatalityCount'] ?? 0,
             'incident_datetime' => $validated['incidentDate'].' 00:00:00',
+            'status' => $vehicularAccident->status === 'returned' ? 'recorded' : $vehicularAccident->status,
         ]);
 
         // Replace involved persons
@@ -145,7 +162,12 @@ class MobileVehicularAccidentController extends Controller
             }
         }
 
-        return response()->json($this->toMobile($vehicularAccident->load(['location.barangay', 'involvedPersons', 'images'])));
+        return response()->json($this->toMobile($vehicularAccident->load([
+            'location.barangay',
+            'involvedPersons',
+            'images',
+            'validations' => fn ($query) => $query->with('validator')->latest('validated_at'),
+        ])));
     }
 
     public function destroy(Request $request, VehicularAccident $vehicularAccident): JsonResponse
@@ -191,26 +213,65 @@ class MobileVehicularAccidentController extends Controller
 
     protected function barangayFromPayload(array $payload): Barangay
     {
-        return Barangay::firstOrCreate([
-            'barangay_name' => $payload['barangay'],
-            'municipality' => 'Matanao',
-            'province' => 'Davao del Sur',
+        $barangay = Barangay::query()
+            ->active()
+            ->where('barangay_name', trim((string) $payload['barangay']))
+            ->first();
+
+        if ($barangay !== null) {
+            return $barangay;
+        }
+
+        throw ValidationException::withMessages([
+            'barangay' => 'The selected barangay is not available for accident reporting.',
         ]);
     }
 
     protected function createLocation(array $payload, Barangay $barangay): IncidentLocation
     {
+        $coordinates = $this->resolvedCoordinates(
+            $payload['latitude'] ?? null,
+            $payload['longitude'] ?? null,
+        );
+
         return IncidentLocation::create([
             'barangay_id' => $barangay->barangay_id,
-            'latitude' => $payload['latitude'] ?? 0,
-            'longitude' => $payload['longitude'] ?? 0,
+            'latitude' => $coordinates['lat'],
+            'longitude' => $coordinates['lng'],
             'road_segment' => $payload['roadSegment'] ?? null,
             'sitio_purok' => $payload['purok'] ?? null,
         ]);
     }
 
+    protected function resolvedCoordinates(mixed $latitude, mixed $longitude): array
+    {
+        if ($this->hasCoordinates($latitude, $longitude)) {
+            return [
+                'lat' => (float) $latitude,
+                'lng' => (float) $longitude,
+            ];
+        }
+
+        throw ValidationException::withMessages([
+            'latitude' => 'Capture a valid GPS location before submitting the accident report.',
+            'longitude' => 'Capture a valid GPS location before submitting the accident report.',
+        ]);
+    }
+
+    protected function hasCoordinates(mixed $latitude, mixed $longitude): bool
+    {
+        if (! is_numeric($latitude) || ! is_numeric($longitude)) {
+            return false;
+        }
+
+        return ! ((float) $latitude === 0.0 && (float) $longitude === 0.0);
+    }
+
     protected function toMobile(VehicularAccident $accident): array
     {
+        $latestValidation = $accident->validations->first();
+        $showValidationFeedback = $accident->status !== 'recorded';
+
         return [
             'id' => $accident->accident_id,
             'barangay' => $accident->location?->barangay?->barangay_name ?? '',
@@ -229,10 +290,17 @@ class MobileVehicularAccidentController extends Controller
                 'contactNumber' => $p->contact_number ?? '',
             ])->all(),
             'photos' => $accident->images->pluck('image_path')->all(),
-            'longitude' => (string) $accident->location?->longitude,
-            'latitude' => (string) $accident->location?->latitude,
+            'longitude' => $this->hasCoordinates($accident->location?->longitude, $accident->location?->latitude)
+                ? (string) $accident->location?->longitude
+                : '',
+            'latitude' => $this->hasCoordinates($accident->location?->latitude, $accident->location?->longitude)
+                ? (string) $accident->location?->latitude
+                : '',
             'incidentDate' => optional($accident->incident_datetime)->format('Y-m-d'),
             'status' => $accident->status,
+            'validationRemarks' => $showValidationFeedback ? ($latestValidation?->remarks ?? '') : '',
+            'validatedAt' => $showValidationFeedback ? (optional($latestValidation?->validated_at)->toIso8601String() ?? '') : '',
+            'validatedBy' => $showValidationFeedback ? ($latestValidation?->validator?->full_name ?? '') : '',
             'createdAt' => (string) $accident->created_at,
         ];
     }

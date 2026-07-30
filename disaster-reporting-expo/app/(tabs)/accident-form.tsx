@@ -16,8 +16,25 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../src/context/AuthContext';
 import { useVehicularAccidents } from '../../src/context/VehicularAccidentContext';
+import { api } from '../../src/services/api';
 import { InvolvedPerson, MATANAO_BARANGAYS, VehicularAccidentPayload } from '../../src/types';
+
+function hasValidCoordinates(latitude?: string, longitude?: string) {
+  if (!latitude || !longitude) {
+    return false;
+  }
+
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return false;
+  }
+
+  return !(lat === 0 && lng === 0);
+}
 
 function buildEmptyForm(): VehicularAccidentPayload {
   const today = new Date().toISOString().split('T')[0];
@@ -48,6 +65,7 @@ export default function AccidentFormScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const accidentId = params.id ? Number(params.id) : undefined;
+  const { token } = useAuth();
   const { getAccidentById, createAccident, updateAccident } = useVehicularAccidents();
 
   const existingAccident = useMemo(() => {
@@ -56,16 +74,52 @@ export default function AccidentFormScreen() {
   }, [getAccidentById, accidentId]);
 
   const [form, setForm] = useState<VehicularAccidentPayload>(buildEmptyForm());
+  const [barangayOptions, setBarangayOptions] = useState<string[]>([...MATANAO_BARANGAYS]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (existingAccident) {
-      const { id, status, createdAt, ...payload } = existingAccident;
+      const { id, status, validationRemarks, validatedAt, validatedBy, createdAt, ...payload } = existingAccident;
       setForm(payload);
     } else {
       setForm(buildEmptyForm());
     }
   }, [existingAccident, accidentId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBarangays() {
+      try {
+        const options = await api.getBarangays(token || undefined);
+        const names = options.map((item) => item.name);
+
+        if (cancelled || names.length === 0) {
+          return;
+        }
+
+        setBarangayOptions(names);
+        setForm((current) => {
+          if (current.barangay && names.includes(current.barangay)) {
+            return current;
+          }
+
+          return {
+            ...current,
+            barangay: names[0],
+          };
+        });
+      } catch (error) {
+        console.error('[AccidentForm] Failed to load barangays:', error);
+      }
+    }
+
+    loadBarangays();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const setField = <K extends keyof VehicularAccidentPayload>(key: K, value: VehicularAccidentPayload[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -76,12 +130,14 @@ export default function AccidentFormScreen() {
   };
 
   const updatePerson = (index: number, field: keyof InvolvedPerson, value: string) => {
-    const updated = form.involvedPersons.map((p, i) => (i === index ? { ...p, [field]: value } : p));
+    const updated = form.involvedPersons.map((person, personIndex) => (
+      personIndex === index ? { ...person, [field]: value } : person
+    ));
     setField('involvedPersons', updated);
   };
 
   const removePerson = (index: number) => {
-    setField('involvedPersons', form.involvedPersons.filter((_, i) => i !== index));
+    setField('involvedPersons', form.involvedPersons.filter((_, personIndex) => personIndex !== index));
   };
 
   const fillCurrentLocation = async () => {
@@ -119,12 +175,17 @@ export default function AccidentFormScreen() {
   };
 
   const removePhoto = (index: number) => {
-    setField('photos', (form.photos || []).filter((_, i) => i !== index));
+    setField('photos', (form.photos || []).filter((_, photoIndex) => photoIndex !== index));
   };
 
   const submit = async () => {
     if (!form.barangay || !form.accidentType || !form.description) {
       Alert.alert('Missing fields', 'Please complete barangay, accident type, and description.');
+      return;
+    }
+
+    if (!hasValidCoordinates(form.latitude, form.longitude)) {
+      Alert.alert('Missing GPS', 'Capture a valid GPS location before submitting the accident report.');
       return;
     }
 
@@ -135,7 +196,7 @@ export default function AccidentFormScreen() {
       } else {
         await createAccident(form);
       }
-      Alert.alert('Success', existingAccident ? 'Accident report updated.' : 'Accident report submitted.');
+      Alert.alert('Success', existingAccident ? 'Accident report updated and sent back for review.' : 'Accident report submitted.');
       router.replace('/(tabs)/vehicular-accidents');
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Unable to save accident report.');
@@ -148,11 +209,19 @@ export default function AccidentFormScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
         <Text style={styles.title}>{existingAccident ? 'Edit accident report' : 'New accident report'}</Text>
+        {existingAccident?.status === 'returned' ? (
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeTitle}>Returned accident report</Text>
+            <Text style={styles.noticeText}>
+              {existingAccident.validationRemarks || 'This accident report was returned for revision. Update the details and submit again.'}
+            </Text>
+          </View>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Location</Text>
         <View style={styles.pickerWrapper}>
           <Picker selectedValue={form.barangay} onValueChange={(value) => setField('barangay', value)}>
-            {MATANAO_BARANGAYS.map((item) => (
+            {barangayOptions.map((item) => (
               <Picker.Item key={item} label={item} value={item} />
             ))}
           </Picker>
@@ -181,24 +250,30 @@ export default function AccidentFormScreen() {
           onChangeText={(value) => setField('description', value)}
         />
 
+        <Text style={styles.fieldLabel}>Vehicles involved</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
           placeholder="Vehicles involved"
+          accessibilityLabel="Vehicles involved"
           value={String(form.vehiclesInvolved)}
           onChangeText={(value) => setField('vehiclesInvolved', Number(value || 0))}
         />
+        <Text style={styles.fieldLabel}>Number of injured persons</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
           placeholder="Injured count"
+          accessibilityLabel="Number of injured persons"
           value={String(form.injuredCount)}
           onChangeText={(value) => setField('injuredCount', Number(value || 0))}
         />
+        <Text style={styles.fieldLabel}>Number of fatalities</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
           placeholder="Fatality count"
+          accessibilityLabel="Number of fatalities"
           value={String(form.fatalityCount)}
           onChangeText={(value) => setField('fatalityCount', Number(value || 0))}
         />
@@ -265,6 +340,7 @@ export default function AccidentFormScreen() {
         </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>GPS</Text>
+        <Text style={styles.mutedText}>Capture a valid GPS point so the accident appears correctly on the GIS map.</Text>
         <View style={styles.gpsRow}>
           <TextInput
             style={[styles.input, styles.halfInput]}
@@ -327,6 +403,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 16,
   },
+  noticeBox: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  noticeTitle: {
+    color: '#991b1b',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  noticeText: {
+    color: '#7f1d1d',
+    lineHeight: 19,
+  },
   sectionTitle: {
     color: '#111827',
     fontSize: 16,
@@ -342,6 +436,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 12,
+  },
+  fieldLabel: {
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
   },
   textArea: {
     minHeight: 110,
@@ -443,5 +543,6 @@ const styles = StyleSheet.create({
   mutedText: {
     color: '#6b7280',
     marginBottom: 8,
+    lineHeight: 18,
   },
 });

@@ -5,7 +5,7 @@
     <div>
         <div class="pill">Super Admin</div>
         <h1>User Accounts</h1>
-        <p class="muted">Create accounts, assign roles, activate/deactivate users, and reset passwords.</p>
+        <p class="muted">Create accounts, assign roles, activate/deactivate users, and reset passwords. All account changes are recorded in the audit trail.</p>
     </div>
 </div>
 

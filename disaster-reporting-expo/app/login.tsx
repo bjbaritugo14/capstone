@@ -15,7 +15,7 @@ import { useAuth } from '../src/context/AuthContext';
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
-  const [email, setEmail] = useState('mdrrmo@example.com');
+  const [email, setEmail] = useState('field@example.com');
   const [password, setPassword] = useState('password');
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,7 +35,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Disaster Reporting</Text>
-        <Text style={styles.subtitle}>Expo mobile app ready to connect to your Laravel API</Text>
+        <Text style={styles.subtitle}>Field Officer mobile reporting connected to the Matanao Laravel system</Text>
 
         <TextInput
           style={styles.input}
@@ -58,7 +58,7 @@ export default function LoginScreen() {
           {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Login</Text>}
         </TouchableOpacity>
 
-        <Text style={styles.helper}>Use your Laravel account, for example mdrrmo@example.com / password.</Text>
+        <Text style={styles.helper}>Use an active Field Officer account, for example field@example.com / password.</Text>
       </View>
     </SafeAreaView>
   );

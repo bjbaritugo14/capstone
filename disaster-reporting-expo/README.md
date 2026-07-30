@@ -1,6 +1,6 @@
 # Disaster Reporting Expo App
 
-A ready-to-run Expo mobile app sample for a Laravel API backend.
+A Field Officer disaster and vehicular-accident reporting app for the Matanao Laravel backend.
 
 ## Included screens
 
@@ -8,6 +8,7 @@ A ready-to-run Expo mobile app sample for a Laravel API backend.
 - Dashboard with record count, search, edit, and delete
 - Reporting form with address, damage details, photos, GPS, and date
 - Profile with change password
+- Field Officer-only authenticated access
 
 ## Tech stack
 
@@ -135,5 +136,6 @@ Route::middleware('auth:sanctum')->group(function () {
 ## Notes
 
 - In mock mode, login accepts any email and password.
+- In real API mode, only active `field_officer` accounts can use the mobile reporting screens.
 - Image upload currently stores local image URIs in the app. For Laravel production use, upload files as `multipart/form-data` and store returned URLs.
 - GPS uses the device's current foreground location permission.

@@ -74,6 +74,8 @@ class LoginController extends Controller
         return match ($role) {
             'admin', 'super_admin' => redirect()->route('admin.users'),
             'dswd' => redirect()->route('dswd.dashboard'),
+            'validator' => redirect()->route('validation.index'),
+            'field_officer' => redirect()->route('field-officer.dashboard'),
             default => redirect()->route('dashboard'),
         };
     }

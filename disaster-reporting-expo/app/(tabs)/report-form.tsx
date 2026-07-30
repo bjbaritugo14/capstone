@@ -16,8 +16,25 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../src/context/AuthContext';
 import { useReports } from '../../src/context/ReportContext';
+import { api } from '../../src/services/api';
 import { AffectedFamily, DISASTER_TYPES, MATANAO_BARANGAYS, ReportPayload, SEVERITY_LEVELS } from '../../src/types';
+
+function hasValidCoordinates(latitude?: string, longitude?: string) {
+  if (!latitude || !longitude) {
+    return false;
+  }
+
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return false;
+  }
+
+  return !(lat === 0 && lng === 0);
+}
 
 function buildEmptyForm(): ReportPayload {
   const today = new Date().toISOString().split('T')[0];
@@ -54,6 +71,7 @@ export default function ReportFormScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const reportId = params.id ? Number(params.id) : undefined;
+  const { token } = useAuth();
   const { getReportById, createReport, updateReport } = useReports();
 
   const existingReport = useMemo(() => {
@@ -62,41 +80,75 @@ export default function ReportFormScreen() {
   }, [getReportById, reportId]);
 
   const [form, setForm] = useState<ReportPayload>(buildEmptyForm());
+  const [barangayOptions, setBarangayOptions] = useState<string[]>([...MATANAO_BARANGAYS]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (existingReport) {
-      const { id, createdAt, ...payload } = existingReport;
+      const { id, status, validationRemarks, validatedAt, validatedBy, createdAt, ...payload } = existingReport;
       setForm(payload);
     } else {
       setForm(buildEmptyForm());
     }
   }, [existingReport, reportId]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBarangays() {
+      try {
+        const options = await api.getBarangays(token || undefined);
+        const names = options.map((item) => item.name);
+
+        if (cancelled || names.length === 0) {
+          return;
+        }
+
+        setBarangayOptions(names);
+        setForm((current) => {
+          if (current.barangay && names.includes(current.barangay)) {
+            return current;
+          }
+
+          return {
+            ...current,
+            barangay: names[0],
+          };
+        });
+      } catch (error) {
+        console.error('[ReportForm] Failed to load barangays:', error);
+      }
+    }
+
+    loadBarangays();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   const setField = <K extends keyof ReportPayload>(key: K, value: ReportPayload[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
   const addFamily = () => {
-    const updated = [...form.families, buildEmptyFamily()];
     setForm((current) => ({
       ...current,
-      families: updated,
-      affectedStructures: updated.length,
+      families: [...current.families, buildEmptyFamily()],
     }));
   };
 
-  const updateFamily = (index: number, field: keyof AffectedFamily, value: any) => {
-    const updated = form.families.map((f, i) => (i === index ? { ...f, [field]: value } : f));
+  const updateFamily = (index: number, field: keyof AffectedFamily, value: string | number | string[]) => {
+    const updated = form.families.map((family, familyIndex) => (
+      familyIndex === index ? { ...family, [field]: value } : family
+    ));
     setForm((current) => ({ ...current, families: updated }));
   };
 
   const removeFamily = (index: number) => {
-    const updated = form.families.filter((_, i) => i !== index);
     setForm((current) => ({
       ...current,
-      families: updated,
-      affectedStructures: updated.length,
+      families: current.families.filter((_, familyIndex) => familyIndex !== index),
     }));
   };
 
@@ -124,7 +176,7 @@ export default function ReportFormScreen() {
 
   const removeFamilyPhoto = (familyIndex: number, photoIndex: number) => {
     const currentPhotos = form.families[familyIndex].photos || [];
-    updateFamily(familyIndex, 'photos', currentPhotos.filter((_, i) => i !== photoIndex));
+    updateFamily(familyIndex, 'photos', currentPhotos.filter((_, index) => index !== photoIndex));
   };
 
   const fillFamilyLocation = async (index: number) => {
@@ -136,12 +188,19 @@ export default function ReportFormScreen() {
     }
 
     const position = await Location.getCurrentPositionAsync({});
-    const updated = form.families.map((f, i) =>
-      i === index
-        ? { ...f, latitude: position.coords.latitude.toFixed(6), longitude: position.coords.longitude.toFixed(6) }
-        : f
-    );
-    setForm((current) => ({ ...current, families: updated }));
+    const latitude = position.coords.latitude.toFixed(6);
+    const longitude = position.coords.longitude.toFixed(6);
+
+    const updated = form.families.map((family, familyIndex) => (
+      familyIndex === index ? { ...family, latitude, longitude } : family
+    ));
+
+    setForm((current) => ({
+      ...current,
+      families: updated,
+      latitude: current.latitude || latitude,
+      longitude: current.longitude || longitude,
+    }));
   };
 
   const submit = async () => {
@@ -155,15 +214,26 @@ export default function ReportFormScreen() {
       return;
     }
 
-    // Build top-level description and severity from first family (for backward compat)
+    if (!Number.isInteger(form.affectedStructures) || form.affectedStructures < 0) {
+      Alert.alert('Invalid structures', 'Affected structures must be a whole number of zero or more.');
+      return;
+    }
+
+    const familyWithCoordinates = form.families.find((family) => hasValidCoordinates(family.latitude, family.longitude));
+    const hasMapLocation = Boolean(familyWithCoordinates) || hasValidCoordinates(form.latitude, form.longitude);
+
+    if (!hasMapLocation) {
+      Alert.alert('Missing GPS', 'Capture GPS coordinates for at least one affected family before submitting.');
+      return;
+    }
+
     const submissionForm: ReportPayload = {
       ...form,
       description: form.families[0]?.description || form.description || 'Disaster report',
       severity: form.families[0]?.severity || form.severity,
-      latitude: form.families[0]?.latitude || form.latitude,
-      longitude: form.families[0]?.longitude || form.longitude,
-      photos: form.families.flatMap((f) => f.photos || []),
-      affectedStructures: form.families.length,
+      latitude: familyWithCoordinates?.latitude || form.latitude,
+      longitude: familyWithCoordinates?.longitude || form.longitude,
+      photos: form.families.flatMap((family) => family.photos || []),
     };
 
     try {
@@ -173,12 +243,12 @@ export default function ReportFormScreen() {
       } else {
         await createReport(submissionForm);
       }
-      Alert.alert('Success', existingReport ? 'Report updated and saved to server.' : 'Report submitted and saved to server.');
+      Alert.alert('Success', existingReport ? 'Report updated and sent back for review.' : 'Report submitted and saved to server.');
       router.replace('/(tabs)/dashboard');
     } catch (error) {
       console.error('[ReportForm] Submit error:', error);
-      const msg = error instanceof Error ? error.message : 'Unable to save report.';
-      Alert.alert('Error', `Failed to save: ${msg}`);
+      const message = error instanceof Error ? error.message : 'Unable to save report.';
+      Alert.alert('Error', `Failed to save: ${message}`);
     } finally {
       setSubmitting(false);
     }
@@ -188,11 +258,19 @@ export default function ReportFormScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
         <Text style={styles.title}>{existingReport ? 'Edit report' : 'New report'}</Text>
+        {existingReport?.status === 'returned' ? (
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeTitle}>Returned report</Text>
+            <Text style={styles.noticeText}>
+              {existingReport.validationRemarks || 'This report was returned for revision. Update the details and submit again.'}
+            </Text>
+          </View>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Location</Text>
         <View style={styles.pickerWrapper}>
           <Picker selectedValue={form.barangay} onValueChange={(value) => setField('barangay', value)}>
-            {MATANAO_BARANGAYS.map((item) => (
+            {barangayOptions.map((item) => (
               <Picker.Item key={item} label={item} value={item} />
             ))}
           </Picker>
@@ -207,6 +285,15 @@ export default function ReportFormScreen() {
             ))}
           </Picker>
         </View>
+
+        <Text style={styles.sectionTitle}>Affected Structures</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Number of damaged or affected structures"
+          keyboardType="number-pad"
+          value={String(form.affectedStructures)}
+          onChangeText={(value) => setField('affectedStructures', Number(value || 0))}
+        />
 
         <Text style={styles.sectionTitle}>Date</Text>
         <TextInput
@@ -226,7 +313,9 @@ export default function ReportFormScreen() {
         <Text style={styles.sectionTitle}>Affected Families</Text>
         <Text style={styles.mutedText}>
           Each family entry includes its own description, severity, location, and photos.
-          Affected structures: {form.families.length} (auto-counted)
+        </Text>
+        <Text style={styles.mutedText}>
+          Capture GPS coordinates for at least one affected family so the report appears correctly on the GIS map.
         </Text>
 
         {form.families.map((family, index) => (
@@ -275,7 +364,7 @@ export default function ReportFormScreen() {
             <TextInput
               style={[styles.input, styles.textArea]}
               multiline
-              placeholder="Describe the damage/situation for this family"
+              placeholder="Describe the damage or situation for this family"
               value={family.description}
               onChangeText={(value) => updateFamily(index, 'description', value)}
             />
@@ -315,8 +404,8 @@ export default function ReportFormScreen() {
             <Text style={styles.subLabel}>Photos</Text>
             <View style={styles.photoRow}>
               {(family.photos || []).length > 0 ? (
-                (family.photos || []).map((photo, pIdx) => (
-                  <TouchableOpacity key={pIdx} onPress={() => removeFamilyPhoto(index, pIdx)}>
+                (family.photos || []).map((photo, photoIndex) => (
+                  <TouchableOpacity key={photoIndex} onPress={() => removeFamilyPhoto(index, photoIndex)}>
                     <Image source={{ uri: photo }} style={styles.photo} />
                     <View style={styles.photoRemoveBadge}>
                       <Ionicons name="close-circle" size={18} color="#dc2626" />
@@ -366,6 +455,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#111827',
     marginBottom: 16,
+  },
+  noticeBox: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  noticeTitle: {
+    color: '#991b1b',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  noticeText: {
+    color: '#7f1d1d',
+    lineHeight: 19,
   },
   sectionTitle: {
     fontSize: 16,
@@ -421,6 +528,13 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontSize: 15,
   },
+  gpsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  halfInput: {
+    flex: 1,
+  },
   photoRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -442,6 +556,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 8,
     fontSize: 13,
+    lineHeight: 18,
   },
   secondaryButton: {
     borderRadius: 12,
@@ -458,31 +573,23 @@ const styles = StyleSheet.create({
   addFamilyButton: {
     borderRadius: 12,
     backgroundColor: '#eff6ff',
-    borderWidth: 2,
-    borderColor: '#93c5fd',
-    borderStyle: 'dashed',
-    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 14,
+    marginTop: 4,
   },
   secondaryButtonText: {
     color: '#1d4ed8',
     fontWeight: '700',
   },
-  gpsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  halfInput: {
-    flex: 1,
-  },
   footerActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 12,
+    marginTop: 18,
   },
   cancelButton: {
     flex: 1,

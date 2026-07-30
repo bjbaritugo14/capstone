@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AccidentValidation;
 use App\Models\DamageReport;
 use App\Models\ReportValidation;
 use App\Models\VehicularAccident;
+use App\Services\AuditTrailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -72,12 +74,12 @@ class ValidationController extends Controller
 
     public function showAccident(VehicularAccident $accident): View
     {
-        $accident->load(['location.barangay', 'user', 'involvedPersons', 'images']);
+        $accident->load(['location.barangay', 'user', 'involvedPersons', 'images', 'validations.validator']);
 
         return view('validation.show-accident', compact('accident'));
     }
 
-    public function validateReport(Request $request, DamageReport $report): RedirectResponse
+    public function validateReport(Request $request, DamageReport $report, AuditTrailService $auditTrail): RedirectResponse
     {
         $report->update(['status' => 'validated']);
 
@@ -91,12 +93,30 @@ class ValidationController extends Controller
             ],
         );
 
+        $report->loadMissing(['location.barangay', 'user']);
+
+        $auditTrail->log(
+            $request,
+            'Validation',
+            'report_validated',
+            'Validated report '.$this->reportCode($report).'.',
+            $report,
+            [
+                'report_code' => $this->reportCode($report),
+                'barangay' => $report->location?->barangay?->barangay_name ?? 'Unassigned',
+                'submitted_by' => $report->user?->full_name ?? 'Unknown user',
+                'status' => 'validated',
+                'remarks' => 'Validated by MDRRMO.',
+            ],
+            $this->reportCode($report),
+        );
+
         return redirect()
             ->route('validation.index')
             ->with('status', 'Report REP-'.str_pad((string) $report->report_id, 4, '0', STR_PAD_LEFT).' has been validated.');
     }
 
-    public function returnReport(Request $request, DamageReport $report): RedirectResponse
+    public function returnReport(Request $request, DamageReport $report, AuditTrailService $auditTrail): RedirectResponse
     {
         $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
@@ -114,21 +134,67 @@ class ValidationController extends Controller
             ],
         );
 
+        $report->loadMissing(['location.barangay', 'user']);
+
+        $auditTrail->log(
+            $request,
+            'Validation',
+            'report_returned',
+            'Returned report '.$this->reportCode($report).' to mobile.',
+            $report,
+            [
+                'report_code' => $this->reportCode($report),
+                'barangay' => $report->location?->barangay?->barangay_name ?? 'Unassigned',
+                'submitted_by' => $report->user?->full_name ?? 'Unknown user',
+                'status' => 'returned',
+                'remarks' => $request->input('reason'),
+            ],
+            $this->reportCode($report),
+        );
+
         return redirect()
             ->route('validation.index')
             ->with('status', 'Report REP-'.str_pad((string) $report->report_id, 4, '0', STR_PAD_LEFT).' has been returned to mobile.');
     }
 
-    public function validateAccident(Request $request, VehicularAccident $accident): RedirectResponse
+    public function validateAccident(Request $request, VehicularAccident $accident, AuditTrailService $auditTrail): RedirectResponse
     {
         $accident->update(['status' => 'validated']);
+
+        AccidentValidation::updateOrCreate(
+            ['accident_id' => $accident->accident_id],
+            [
+                'validated_by' => Auth::id(),
+                'validation_status' => 'validated',
+                'remarks' => 'Validated by MDRRMO.',
+                'validated_at' => now(),
+            ],
+        );
+
+        $accident->loadMissing(['location.barangay', 'user']);
+
+        $auditTrail->log(
+            $request,
+            'Validation',
+            'accident_validated',
+            'Validated accident '.$this->accidentCode($accident).'.',
+            $accident,
+            [
+                'accident_code' => $this->accidentCode($accident),
+                'barangay' => $accident->location?->barangay?->barangay_name ?? 'Unassigned',
+                'submitted_by' => $accident->user?->full_name ?? 'Unknown user',
+                'status' => 'validated',
+                'remarks' => 'Validated by MDRRMO.',
+            ],
+            $this->accidentCode($accident),
+        );
 
         return redirect()
             ->route('validation.index')
             ->with('status', 'Accident ACC-'.str_pad((string) $accident->accident_id, 4, '0', STR_PAD_LEFT).' has been validated.');
     }
 
-    public function returnAccident(Request $request, VehicularAccident $accident): RedirectResponse
+    public function returnAccident(Request $request, VehicularAccident $accident, AuditTrailService $auditTrail): RedirectResponse
     {
         $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
@@ -136,8 +202,46 @@ class ValidationController extends Controller
 
         $accident->update(['status' => 'returned']);
 
+        AccidentValidation::updateOrCreate(
+            ['accident_id' => $accident->accident_id],
+            [
+                'validated_by' => Auth::id(),
+                'validation_status' => 'returned',
+                'remarks' => $request->input('reason'),
+                'validated_at' => now(),
+            ],
+        );
+
+        $accident->loadMissing(['location.barangay', 'user']);
+
+        $auditTrail->log(
+            $request,
+            'Validation',
+            'accident_returned',
+            'Returned accident '.$this->accidentCode($accident).' to mobile.',
+            $accident,
+            [
+                'accident_code' => $this->accidentCode($accident),
+                'barangay' => $accident->location?->barangay?->barangay_name ?? 'Unassigned',
+                'submitted_by' => $accident->user?->full_name ?? 'Unknown user',
+                'status' => 'returned',
+                'remarks' => $request->input('reason'),
+            ],
+            $this->accidentCode($accident),
+        );
+
         return redirect()
             ->route('validation.index')
             ->with('status', 'Accident ACC-'.str_pad((string) $accident->accident_id, 4, '0', STR_PAD_LEFT).' has been returned to mobile.');
+    }
+
+    protected function reportCode(DamageReport $report): string
+    {
+        return 'REP-'.str_pad((string) $report->report_id, 4, '0', STR_PAD_LEFT);
+    }
+
+    protected function accidentCode(VehicularAccident $accident): string
+    {
+        return 'ACC-'.str_pad((string) $accident->accident_id, 4, '0', STR_PAD_LEFT);
     }
 }

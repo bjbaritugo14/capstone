@@ -15,6 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useReports } from '../../src/context/ReportContext';
 import { Report } from '../../src/types';
 
+function formatStatus(status?: Report['status']) {
+  return (status ?? 'pending').replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function hasCoordinates(latitude?: string, longitude?: string) {
+  return Boolean(latitude && longitude && latitude !== '0' && longitude !== '0');
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
   const { reports, loading, refreshReports, deleteReport } = useReports();
@@ -31,6 +39,8 @@ export default function DashboardScreen() {
         report.description ?? '',
         report.disasterType ?? '',
         report.severity ?? '',
+        report.status ?? '',
+        report.validationRemarks ?? '',
       ]
         .join(' ')
         .toLowerCase()
@@ -63,13 +73,13 @@ export default function DashboardScreen() {
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>Records you submitted</Text>
               <Text style={styles.statValue}>{reports.length}</Text>
-              <Text style={styles.statHelper}>Search, edit, and delete your reports below.</Text>
+              <Text style={styles.statHelper}>Search, track review status, revise returned reports, and delete your submissions.</Text>
             </View>
 
             <View style={styles.toolbar}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search by place, disaster, or description"
+                placeholder="Search by place, status, disaster, or remarks"
                 value={search}
                 onChangeText={setSearch}
               />
@@ -88,7 +98,21 @@ export default function DashboardScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>{item.disasterType ?? 'Unknown'}</Text>
-              <Text style={styles.badge}>{item.severity ?? '-'}</Text>
+              <View style={styles.badgeGroup}>
+                <Text
+                  style={[
+                    styles.statusBadge,
+                    item.status === 'returned'
+                      ? styles.statusReturned
+                      : item.status === 'validated'
+                        ? styles.statusValidated
+                        : styles.statusPending,
+                  ]}
+                >
+                  {formatStatus(item.status)}
+                </Text>
+                <Text style={styles.badge}>{item.severity ?? '-'}</Text>
+              </View>
             </View>
 
             <Text style={styles.cardMeta}>
@@ -99,7 +123,22 @@ export default function DashboardScreen() {
             </Text>
             <Text style={styles.description}>{item.description ?? ''}</Text>
             <Text style={styles.cardMeta}>Date reported: {item.reportDate ?? '-'}</Text>
-            <Text style={styles.cardMeta}>GPS: {item.latitude ?? '-'}, {item.longitude ?? '-'}</Text>
+            <Text style={styles.cardMeta}>
+              GPS: {hasCoordinates(item.latitude, item.longitude) ? `${item.latitude}, ${item.longitude}` : 'No GPS captured'}
+            </Text>
+            {item.validationRemarks ? (
+              <View
+                style={[
+                  styles.feedbackBox,
+                  item.status === 'returned' ? styles.feedbackReturned : styles.feedbackNeutral,
+                ]}
+              >
+                <Text style={styles.feedbackTitle}>
+                  {item.status === 'returned' ? 'Returned with remarks' : 'Validator remarks'}
+                </Text>
+                <Text style={styles.feedbackText}>{item.validationRemarks}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.actions}>
               <TouchableOpacity
@@ -205,10 +244,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  badgeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   cardTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: '#111827',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusPending: {
+    color: '#92400e',
+    backgroundColor: '#fef3c7',
+  },
+  statusValidated: {
+    color: '#166534',
+    backgroundColor: '#dcfce7',
+  },
+  statusReturned: {
+    color: '#991b1b',
+    backgroundColor: '#fee2e2',
   },
   badge: {
     color: '#1d4ed8',
@@ -228,6 +291,31 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginVertical: 8,
     lineHeight: 20,
+  },
+  feedbackBox: {
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  feedbackNeutral: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  feedbackReturned: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  feedbackTitle: {
+    color: '#111827',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  feedbackText: {
+    color: '#374151',
+    lineHeight: 19,
   },
   actions: {
     flexDirection: 'row',

@@ -3,9 +3,9 @@ import { Redirect, Tabs } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function TabsLayout() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || user?.role !== 'field_officer') {
     return <Redirect href="/login" />;
   }
 

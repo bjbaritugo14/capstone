@@ -11,13 +11,19 @@ use App\Models\ReportImage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class MobileReportController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $reports = DamageReport::query()
-            ->with(['location.barangay', 'images', 'affectedFamilyRecords.images'])
+            ->with([
+                'location.barangay',
+                'images',
+                'affectedFamilyRecords.images',
+                'validations' => fn ($query) => $query->with('validator')->latest('validated_at'),
+            ])
             ->where('user_id', $request->user()->user_id)
             ->latest('created_at')
             ->get()
@@ -64,12 +70,8 @@ class MobileReportController extends Controller
 
         try {
             $barangay = $this->barangayFromPayload($validated);
-            $location = $this->createLocation($validated, $barangay);
-
             $families = $validated['families'] ?? [];
-
-            // Auto-count structures from families
-            $affectedStructures = count($families) > 0 ? count($families) : ($validated['affectedStructures'] ?? 0);
+            $location = $this->createLocation($validated, $barangay, $families);
 
             $report = DamageReport::create([
                 'user_id' => $request->user()->user_id,
@@ -78,7 +80,7 @@ class MobileReportController extends Controller
                 'description' => $validated['description'] ?? '',
                 'damage_severity' => $validated['severity'],
                 'affected_families' => count($families),
-                'affected_structures' => $affectedStructures,
+                'affected_structures' => $validated['affectedStructures'] ?? 0,
                 'incident_datetime' => $validated['reportDate'].' 00:00:00',
                 'status' => 'pending',
                 'created_at' => now(),
@@ -122,7 +124,14 @@ class MobileReportController extends Controller
                 }
             }
 
-            return response()->json($this->toMobile($report->load(['location.barangay', 'images', 'affectedFamilyRecords.images'])), 201);
+            return response()->json($this->toMobile($report->load([
+                'location.barangay',
+                'images',
+                'affectedFamilyRecords.images',
+                'validations' => fn ($query) => $query->with('validator')->latest('validated_at'),
+            ])), 201);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             \Log::error('MobileReportController@store failed', [
                 'message' => $e->getMessage(),
@@ -170,23 +179,28 @@ class MobileReportController extends Controller
         ]);
 
         $barangay = $this->barangayFromPayload($validated);
+        $families = $validated['families'] ?? [];
+        $coordinates = $this->resolvedCoordinates(
+            $validated['latitude'] ?? null,
+            $validated['longitude'] ?? null,
+            $families,
+        );
+
         $report->location()->update([
             'barangay_id' => $barangay->barangay_id,
-            'latitude' => $validated['latitude'],
-            'longitude' => $validated['longitude'],
+            'latitude' => $coordinates['lat'],
+            'longitude' => $coordinates['lng'],
             'sitio_purok' => $validated['purok'] ?? null,
         ]);
-
-        $families = $validated['families'] ?? [];
-        $affectedStructures = count($families) > 0 ? count($families) : ($validated['affectedStructures'] ?? 0);
 
         $report->update([
             'disaster_type' => $validated['disasterType'],
             'description' => $validated['description'] ?? '',
             'damage_severity' => $validated['severity'],
             'affected_families' => count($families),
-            'affected_structures' => $affectedStructures,
+            'affected_structures' => $validated['affectedStructures'] ?? 0,
             'incident_datetime' => $validated['reportDate'].' 00:00:00',
+            'status' => $report->status === 'returned' ? 'pending' : $report->status,
         ]);
 
         // Delete old images from storage
@@ -245,7 +259,12 @@ class MobileReportController extends Controller
             }
         }
 
-        return response()->json($this->toMobile($report->load(['location.barangay', 'images', 'affectedFamilyRecords.images'])));
+        return response()->json($this->toMobile($report->load([
+            'location.barangay',
+            'images',
+            'affectedFamilyRecords.images',
+            'validations' => fn ($query) => $query->with('validator')->latest('validated_at'),
+        ])));
     }
 
     public function destroy(Request $request, DamageReport $report): JsonResponse
@@ -264,25 +283,74 @@ class MobileReportController extends Controller
 
     protected function barangayFromPayload(array $payload): Barangay
     {
-        return Barangay::firstOrCreate([
-            'barangay_name' => $payload['barangay'],
-            'municipality' => 'Matanao',
-            'province' => 'Davao del Sur',
+        $barangay = Barangay::query()
+            ->active()
+            ->where('barangay_name', trim((string) $payload['barangay']))
+            ->first();
+
+        if ($barangay !== null) {
+            return $barangay;
+        }
+
+        throw ValidationException::withMessages([
+            'barangay' => 'The selected barangay is not available for reporting.',
         ]);
     }
 
-    protected function createLocation(array $payload, Barangay $barangay): IncidentLocation
+    protected function createLocation(array $payload, Barangay $barangay, array $families): IncidentLocation
     {
+        $coordinates = $this->resolvedCoordinates(
+            $payload['latitude'] ?? null,
+            $payload['longitude'] ?? null,
+            $families,
+        );
+
         return IncidentLocation::create([
             'barangay_id' => $barangay->barangay_id,
-            'latitude' => $payload['latitude'] ?? 0.0,
-            'longitude' => $payload['longitude'] ?? 0.0,
+            'latitude' => $coordinates['lat'],
+            'longitude' => $coordinates['lng'],
             'sitio_purok' => $payload['purok'] ?? null,
         ]);
     }
 
+    protected function resolvedCoordinates(mixed $latitude, mixed $longitude, array $families): array
+    {
+        if ($this->hasCoordinates($latitude, $longitude)) {
+            return [
+                'lat' => (float) $latitude,
+                'lng' => (float) $longitude,
+            ];
+        }
+
+        foreach ($families as $family) {
+            if ($this->hasCoordinates($family['latitude'] ?? null, $family['longitude'] ?? null)) {
+                return [
+                    'lat' => (float) $family['latitude'],
+                    'lng' => (float) $family['longitude'],
+                ];
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'latitude' => 'Capture a valid GPS location before submitting the report.',
+            'longitude' => 'Capture a valid GPS location before submitting the report.',
+        ]);
+    }
+
+    protected function hasCoordinates(mixed $latitude, mixed $longitude): bool
+    {
+        if (! is_numeric($latitude) || ! is_numeric($longitude)) {
+            return false;
+        }
+
+        return ! ((float) $latitude === 0.0 && (float) $longitude === 0.0);
+    }
+
     protected function toMobile(DamageReport $report): array
     {
+        $latestValidation = $report->validations->first();
+        $showValidationFeedback = $report->status !== 'pending';
+
         return [
             'id' => $report->report_id,
             'barangay' => $report->location?->barangay?->barangay_name ?? '',
@@ -303,9 +371,17 @@ class MobileReportController extends Controller
             ])->all(),
             'affectedStructures' => $report->affected_structures,
             'photos' => $report->images->whereNull('family_id')->pluck('image_path')->all(),
-            'longitude' => (string) $report->location?->longitude,
-            'latitude' => (string) $report->location?->latitude,
+            'longitude' => $this->hasCoordinates($report->location?->longitude, $report->location?->latitude)
+                ? (string) $report->location?->longitude
+                : '',
+            'latitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude)
+                ? (string) $report->location?->latitude
+                : '',
             'reportDate' => optional($report->incident_datetime)->format('Y-m-d'),
+            'status' => $report->status,
+            'validationRemarks' => $showValidationFeedback ? ($latestValidation?->remarks ?? '') : '',
+            'validatedAt' => $showValidationFeedback ? (optional($latestValidation?->validated_at)->toIso8601String() ?? '') : '',
+            'validatedBy' => $showValidationFeedback ? ($latestValidation?->validator?->full_name ?? '') : '',
             'createdAt' => (string) $report->created_at,
         ];
     }

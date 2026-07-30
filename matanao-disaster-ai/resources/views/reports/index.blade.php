@@ -200,7 +200,7 @@
 
     const map = L.map('damage-map', {
         zoomControl: true,
-        scrollWheelZoom: false,
+        scrollWheelZoom: true,
     }).setView([mapCenter.lat, mapCenter.lng], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
