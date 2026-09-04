@@ -19,33 +19,51 @@ class ReportController extends Controller
         protected SystemSettingService $settings,
     ) {}
 
-    protected function reports(): array
+    protected function reports(?int $barangayId = null): array
     {
         return DamageReport::query()
             ->with(['location.barangay', 'user', 'recommendation', 'affectedFamilyRecords'])
+            ->when($barangayId, fn ($query) => $query->whereHas(
+                'location',
+                fn ($locationQuery) => $locationQuery->where('barangay_id', $barangayId)
+            ))
             ->latest('created_at')
             ->get()
-            ->map(fn (DamageReport $report) => [
-                'id' => 'REP-'.str_pad((string) $report->report_id, 4, '0', STR_PAD_LEFT),
-                'event' => $report->disaster_type.' Incident',
-                'barangay' => $report->location?->barangay?->barangay_name ?? 'Unassigned',
-                'road_segment' => $report->location?->road_segment ?? 'Unspecified',
-                'sitio_purok' => $report->location?->sitio_purok ?? 'Not specified',
-                'type' => $report->disaster_type,
-                'severity' => $this->severityLabel($report->damage_severity),
-                'families' => $report->affected_families,
-                'household_members' => $report->affectedFamilyRecords->sum('household_members'),
-                'houses' => $report->affected_structures,
-                'status' => ucfirst($report->status),
-                'submitted_by' => $report->user?->full_name ?? 'Unknown user',
-                'coordinates' => $this->coordinates($report->location?->latitude, $report->location?->longitude),
-                'latitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->latitude : null,
-                'longitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->longitude : null,
-                'date' => optional($report->incident_datetime)->format('Y-m-d') ?? '',
-                'time' => optional($report->incident_datetime)->format('h:i A') ?? '',
-                'needs' => $this->needs($report),
-                'impact_score' => $this->impactScore($report),
-            ])
+            ->map(function (DamageReport $report) {
+                $recommendation = $report->recommendation->first();
+                $medicineKits = $this->hasMedicalNeedDescription($report)
+                    ? (int) ($recommendation?->medicine_kits ?? 0)
+                    : 0;
+
+                return [
+                    'id' => 'REP-'.str_pad((string) $report->report_id, 4, '0', STR_PAD_LEFT),
+                    'event' => $report->disaster_type.' Incident',
+                    'barangay_id' => $report->location?->barangay?->barangay_id,
+                    'barangay' => $report->location?->barangay?->barangay_name ?? 'Unassigned',
+                    'road_segment' => $report->location?->road_segment ?? 'Unspecified',
+                    'sitio_purok' => $report->location?->sitio_purok ?? 'Not specified',
+                    'type' => $report->disaster_type,
+                    'severity' => $this->severityLabel($report->damage_severity),
+                    'families' => $report->affected_families,
+                    'named_families' => $report->affectedFamilyRecords->count(),
+                    'household_members' => $report->affectedFamilyRecords->sum('household_members'),
+                    'houses' => $report->affected_structures,
+                    'status' => ucfirst($report->status),
+                    'submitted_by' => $report->user?->full_name ?? 'Unknown user',
+                    'coordinates' => $this->coordinates($report->location?->latitude, $report->location?->longitude),
+                    'latitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->latitude : null,
+                    'longitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->longitude : null,
+                    'date' => optional($report->incident_datetime)->format('Y-m-d') ?? '',
+                    'time' => optional($report->incident_datetime)->format('h:i A') ?? '',
+                    'needs' => $this->needs($report),
+                    'food_packs' => (int) ($recommendation?->food_packs ?? 0),
+                    'cash_assistance' => (float) ($recommendation?->cash_assistance ?? 0),
+                    'medicine_kits' => $medicineKits,
+                    'has_recommendation' => $recommendation !== null,
+                    'family_assistance' => $this->familyAssistanceRows($report, $recommendation),
+                    'impact_score' => $this->impactScore($report),
+                ];
+            })
             ->all();
     }
 
@@ -196,16 +214,58 @@ class ReportController extends Controller
         return redirect()->route('reports.index')->with('status', 'Disaster report saved.');
     }
 
-    public function print(): View
+    public function print(Request $request): View
     {
-        $reports = $this->reports();
+        $filters = $request->validate([
+            'barangay_id' => ['nullable', 'integer', Rule::exists('barangays', 'barangay_id')],
+        ]);
+
+        $selectedBarangayId = filled($filters['barangay_id'] ?? null)
+            ? (int) $filters['barangay_id']
+            : null;
+
+        $reports = $this->reports($selectedBarangayId);
+        $barangays = Barangay::query()->active()->orderBy('barangay_name')->get();
+        $selectedBarangay = $selectedBarangayId
+            ? $barangays->firstWhere('barangay_id', $selectedBarangayId)
+            : null;
+
+        $barangayGroups = collect($reports)
+            ->groupBy('barangay')
+            ->map(fn ($items, string $barangay) => [
+                'barangay' => $barangay,
+                'reports' => $items->values(),
+                'totals' => [
+                    'reports' => $items->count(),
+                    'families' => $items->sum('families'),
+                    'named_families' => $items->sum('named_families'),
+                    'household_members' => $items->sum('household_members'),
+                    'houses' => $items->sum('houses'),
+                    'food_packs' => $items->sum('food_packs'),
+                    'medicine_kits' => $items->sum('medicine_kits'),
+                    'cash_assistance' => $items->sum('cash_assistance'),
+                ],
+            ])
+            ->sortBy('barangay')
+            ->values();
+
         $totals = [
             'reports' => count($reports),
             'families' => array_sum(array_column($reports, 'families')),
             'houses' => array_sum(array_column($reports, 'houses')),
+            'food_packs' => array_sum(array_column($reports, 'food_packs')),
+            'medicine_kits' => array_sum(array_column($reports, 'medicine_kits')),
+            'cash_assistance' => array_sum(array_column($reports, 'cash_assistance')),
         ];
 
-        return view('reports.print', compact('reports', 'totals'));
+        return view('reports.print', compact(
+            'barangayGroups',
+            'barangays',
+            'reports',
+            'selectedBarangay',
+            'selectedBarangayId',
+            'totals',
+        ));
     }
 
     protected function severityLabel(string $severity): string
@@ -246,7 +306,7 @@ class ReportController extends Controller
         return collect([
             $recommendation->cash_assistance > 0 ? 'Cash assistance' : null,
             $recommendation->food_packs > 0 ? 'Food packs' : null,
-            $recommendation->medicine_kits > 0 ? 'Medicine kits' : null,
+            $this->hasMedicalNeedDescription($report) && $recommendation->medicine_kits > 0 ? 'Medicine kits' : null,
         ])->filter()->implode(', ');
     }
 
@@ -301,6 +361,196 @@ class ReportController extends Controller
             'High' => 3,
             'Medium' => 2,
             default => 1,
+        };
+    }
+
+    protected function familyAssistanceRows(DamageReport $report, mixed $recommendation): array
+    {
+        $families = $report->affectedFamilyRecords->values();
+
+        if ($families->isEmpty()) {
+            return [];
+        }
+
+        $foodPacks = (int) ($recommendation?->food_packs ?? 0);
+        $medicineKits = $this->hasMedicalNeedDescription($report)
+            ? (int) ($recommendation?->medicine_kits ?? 0)
+            : 0;
+        $cashAssistance = (float) ($recommendation?->cash_assistance ?? 0);
+        $fallbackSeverity = $this->normalizedSeverity($report->damage_severity);
+
+        $rows = $families
+            ->map(function (AffectedFamily $family) use ($fallbackSeverity): array {
+                $severity = $this->normalizedSeverity($family->damage_severity, $fallbackSeverity);
+
+                return [
+                    'severity_key' => $severity,
+                    'family' => $family,
+                    'name' => $family->family_head_name,
+                    'household_members' => $family->household_members,
+                    'contact_number' => $family->contact_number ?: 'N/A',
+                    'evacuation_status' => $family->evacuation_status ?: 'Not specified',
+                    'severity' => $this->severityLabel($severity),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $foodAllocations = $this->allocateWeightedWholeNumber(
+            $foodPacks,
+            array_map(fn (array $row): float => $this->foodWeight($row['severity_key']), $rows),
+        );
+        $medicineAllocations = $this->allocateWeightedWholeNumber(
+            $medicineKits,
+            array_map(fn (array $row): float => $this->medicineWeight($row['family'], $row['severity_key']), $rows),
+        );
+        $cashAllocations = $this->allocateWeightedMoney(
+            $cashAssistance,
+            array_map(fn (array $row): float => $this->cashWeight($row['severity_key']), $rows),
+        );
+
+        foreach ($rows as $index => $row) {
+            $rows[$index] = [
+                'name' => $row['name'],
+                'household_members' => $row['household_members'],
+                'contact_number' => $row['contact_number'],
+                'evacuation_status' => $row['evacuation_status'],
+                'severity' => $row['severity'],
+                'food_packs' => $foodAllocations[$index] ?? 0,
+                'medicine_kits' => $medicineAllocations[$index] ?? 0,
+                'cash_assistance' => $cashAllocations[$index] ?? 0.0,
+            ];
+        }
+
+        return $rows;
+    }
+
+    protected function foodWeight(string $severity): float
+    {
+        return max(0.01, $this->settings->float('recommendation_food_multiplier_'.$severity));
+    }
+
+    protected function medicineWeight(AffectedFamily $family, string $severity): float
+    {
+        $members = max(1, (int) $family->household_members);
+        $divisor = max(1, $this->settings->integer('recommendation_medicine_divisor_'.$severity));
+        $multiplier = $severity === 'severe'
+            ? max(0.01, $this->settings->float('recommendation_medicine_multiplier_severe'))
+            : 1.0;
+
+        return max(0.01, ($members / $divisor) * $multiplier);
+    }
+
+    protected function cashWeight(string $severity): float
+    {
+        return max(0.01, $this->settings->integer('recommendation_cash_per_family_'.$severity));
+    }
+
+    protected function allocateWeightedWholeNumber(int $total, array $weights): array
+    {
+        $count = count($weights);
+
+        if ($count === 0) {
+            return [];
+        }
+
+        $total = max(0, $total);
+        $weights = array_map(
+            fn (mixed $weight): float => is_numeric($weight) && (float) $weight > 0 ? (float) $weight : 1.0,
+            array_values($weights),
+        );
+        $weightTotal = array_sum($weights);
+        $allocations = array_fill(0, $count, 0);
+        $fractions = array_fill(0, $count, 0.0);
+
+        foreach ($weights as $index => $weight) {
+            $rawShare = $weightTotal > 0 ? ($total * $weight) / $weightTotal : $total / $count;
+            $allocations[$index] = (int) floor($rawShare);
+            $fractions[$index] = $rawShare - $allocations[$index];
+        }
+
+        $remaining = $total - array_sum($allocations);
+        $order = array_keys($weights);
+
+        usort($order, function (int $left, int $right) use ($fractions, $weights): int {
+            return $fractions[$right] <=> $fractions[$left]
+                ?: $weights[$right] <=> $weights[$left]
+                ?: $left <=> $right;
+        });
+
+        for ($step = 0; $step < $remaining; $step++) {
+            $allocations[$order[$step % $count]]++;
+        }
+
+        return $allocations;
+    }
+
+    protected function allocateWeightedMoney(float $total, array $weights): array
+    {
+        $centavos = (int) round(max(0, $total) * 100);
+
+        return array_map(
+            fn (int $amount): float => $amount / 100,
+            $this->allocateWeightedWholeNumber($centavos, $weights),
+        );
+    }
+
+    protected function hasMedicalNeedDescription(DamageReport $report): bool
+    {
+        return $this->containsAny(
+            strtolower($this->descriptionText($report)),
+            $this->medicalDescriptionTerms(),
+        );
+    }
+
+    protected function descriptionText(DamageReport $report): string
+    {
+        return collect([(string) $report->description])
+            ->merge($report->affectedFamilyRecords->pluck('description')->all())
+            ->filter(fn (mixed $description): bool => trim((string) $description) !== '')
+            ->map(fn (mixed $description): string => trim((string) $description))
+            ->implode(' ');
+    }
+
+    protected function medicalDescriptionTerms(): array
+    {
+        return [
+            'injur',
+            'wound',
+            'medical',
+            'medicine',
+            'hospital',
+            'sick',
+            'nasamdan',
+            'naangol',
+            'samad',
+            'medikal',
+            'pangmedikal',
+            'tambal',
+            'ospital',
+            'masakiton',
+            'nagsakit',
+        ];
+    }
+
+    protected function containsAny(string $value, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if (str_contains($value, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function normalizedSeverity(?string $severity, string $fallback = 'minor'): string
+    {
+        return match (strtolower((string) $severity)) {
+            'severe', 'high' => 'severe',
+            'moderate', 'medium' => 'moderate',
+            'minor', 'low' => 'minor',
+            default => $fallback,
         };
     }
 }

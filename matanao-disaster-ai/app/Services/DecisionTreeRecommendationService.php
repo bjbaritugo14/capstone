@@ -14,30 +14,32 @@ class DecisionTreeRecommendationService
     {
         $report->loadMissing(['affectedFamilyRecords', 'location.barangay']);
 
-        $families = max(1, $report->affectedFamilyRecords->count() ?: $report->affected_families);
-        $members = $report->affectedFamilyRecords->sum('household_members');
-        $members = $members > 0 ? $members : $families * $this->settings->integer('recommendation_default_household_size');
+        $severityCounts = $this->severityCounts($report);
+        $families = max(1, array_sum($severityCounts));
+        $membersBySeverity = $this->membersBySeverity($report, $severityCounts);
+        $members = array_sum($membersBySeverity);
         $structures = max(0, (int) $report->affected_structures);
-        $severity = in_array($report->damage_severity, ['minor', 'moderate', 'severe'], true)
-            ? $report->damage_severity
-            : 'minor';
+        $severity = $this->highestSeverity($severityCounts);
         $disasterType = trim((string) $report->disaster_type) ?: 'Other';
         $barangay = $report->location?->barangay?->barangay_name ?? 'Unassigned';
-        $description = trim((string) $report->description);
+        $description = $this->descriptionText($report);
 
-        $baseline = match ($severity) {
-            'severe' => $this->severeRecommendation($families, $members, $structures),
-            'moderate' => $this->moderateRecommendation($families, $members, $structures),
-            default => $this->minorRecommendation($families, $members, $structures),
-        };
+        $baseline = $this->combinedRecommendation($severityCounts, $membersBySeverity, $structures, $severity);
         $context = $this->contextAdjustments($disasterType, $description);
         $priority = $this->priority($severity, $families, $structures);
+        $severitySummary = $this->severitySummary($severityCounts);
         $signals = $context['signals'] === []
             ? 'no additional contextual escalation'
             : implode('; ', $context['signals']);
+        $foodPacks = max(1, (int) ceil($baseline['food_packs'] * $context['food_multiplier']));
+        $medicineKits = $context['medical_needs']
+            ? max(1, (int) ceil($baseline['medicine_kits'] * $context['medicine_multiplier']))
+            : 0;
+        $cashAssistance = round(max(0, $baseline['cash_assistance'] * $context['cash_multiplier']), 2);
 
         $inputs = [
             'damage_severity' => $severity,
+            'severity_counts' => $severityCounts,
             'affected_families' => $families,
             'household_members' => $members,
             'affected_structures' => $structures,
@@ -46,13 +48,15 @@ class DecisionTreeRecommendationService
             'description' => $description,
             'priority' => $priority,
             'context_signals' => $context['signals'],
+            'medical_needs' => $context['medical_needs'],
+            'output_scope' => 'full_assistance',
         ];
 
         return [
-            'food_packs' => max(1, (int) ceil($baseline['food_packs'] * $context['food_multiplier'])),
-            'medicine_kits' => max(1, (int) ceil($baseline['medicine_kits'] * $context['medicine_multiplier'])),
-            'cash_assistance' => round(max(0, $baseline['cash_assistance'] * $context['cash_multiplier']), 2),
-            'basis' => "Decision Tree: {$priority} priority {$disasterType} response for Barangay {$barangay}; {$severity} damage, {$families} affected families, {$members} household members, and {$structures} affected structures. Context: {$signals}.",
+            'food_packs' => $foodPacks,
+            'medicine_kits' => $medicineKits,
+            'cash_assistance' => $cashAssistance,
+            'basis' => "Decision Tree: {$priority} priority {$disasterType} response for Barangay {$barangay}; {$severity} effective damage from {$severitySummary}, {$families} affected families, {$members} household members, and {$structures} affected structures. Context: {$signals}.",
             'source' => 'decision_tree',
             'inputs' => $inputs,
         ];
@@ -62,18 +66,18 @@ class DecisionTreeRecommendationService
     {
         return [
             [
-                'condition' => 'IF damage severity is severe',
-                'logic' => 'Food packs = affected families x '.$this->settings->format('recommendation_food_multiplier_severe', $this->settings->float('recommendation_food_multiplier_severe')).'; medicine kits use household members with a severe multiplier; cash assistance uses configured severe family and structure rates.',
+                'condition' => 'IF affected-family severity is severe',
+                'logic' => 'Food packs = severe families x '.$this->settings->format('recommendation_food_multiplier_severe', $this->settings->float('recommendation_food_multiplier_severe')).'; medicine kits are calculated only when the report or family description contains medical-need terms; cash assistance uses configured severe family rates. Report-level structure assistance uses the highest family severity present.',
                 'output' => 'High priority assistance',
             ],
             [
-                'condition' => 'IF damage severity is moderate',
-                'logic' => 'Food packs = affected families x '.$this->settings->format('recommendation_food_multiplier_moderate', $this->settings->float('recommendation_food_multiplier_moderate')).'; medicine kits are based on household members; cash assistance uses the configured moderate family and structure rates.',
+                'condition' => 'IF affected-family severity is moderate',
+                'logic' => 'Food packs = moderate families x '.$this->settings->format('recommendation_food_multiplier_moderate', $this->settings->float('recommendation_food_multiplier_moderate')).'; medicine kits are calculated only when the report or family description contains medical-need terms; cash assistance uses the configured moderate family rates.',
                 'output' => 'Medium priority assistance',
             ],
             [
-                'condition' => 'IF damage severity is minor',
-                'logic' => 'Food packs = affected families x '.$this->settings->format('recommendation_food_multiplier_minor', $this->settings->float('recommendation_food_multiplier_minor')).'; medicine kits and cash assistance use the lowest configured rates.',
+                'condition' => 'IF affected-family severity is minor',
+                'logic' => 'Food packs = minor families x '.$this->settings->format('recommendation_food_multiplier_minor', $this->settings->float('recommendation_food_multiplier_minor')).'; medicine kits are zero unless medical-need terms are present; cash assistance uses the lowest configured family rates.',
                 'output' => 'Low priority assistance',
             ],
             [
@@ -86,6 +90,11 @@ class DecisionTreeRecommendationService
                 'logic' => 'Predefined contextual branches apply modest food, medicine, or cash multipliers and record the exact signals in the recommendation basis.',
                 'output' => 'Context-adjusted assistance with an auditable basis',
             ],
+            [
+                'condition' => 'IF description contains injured, wound, medical, medicine, hospital, sick, nasamdan, naangol, samad, medikal, pangmedikal, tambal, ospital, masakiton, or nagsakit',
+                'logic' => 'The Decision Tree increases medicine-kit planning while food packs and cash assistance are still calculated using the normal severity, family, and structure rules.',
+                'output' => 'Medical-needs assistance with medicine kits added while food packs and cash assistance are preserved',
+            ],
         ];
     }
 
@@ -94,11 +103,133 @@ class DecisionTreeRecommendationService
         return [
             'Decision Tree is the main recommendation algorithm.',
             'Ollama is not trained from scratch; it receives structured disaster data and returns JSON.',
-            'If Ollama is unavailable, the Decision Tree still generates food packs, medicine kits, and cash assistance.',
-            'Inputs are severity, affected families, household members, affected structures, disaster type, barangay, and description; all are stored with the generated result.',
-            'Outputs are food packs, medicine kits, cash assistance, and recommendation basis.',
+            'If Ollama is unavailable, the Decision Tree still generates food packs, cash assistance, and medicine kits only when medical-need terms are present.',
+            'Inputs are affected-family severity counts, effective severity, affected families, household members, affected structures, disaster type, barangay, and description; all are stored with the generated result.',
+            'Outputs are food packs, medicine kits, cash assistance, and recommendation basis; medicine kits are zero unless medical-need descriptions are detected.',
             'Recommendation multipliers and thresholds can be managed by administrators in System Settings.',
         ];
+    }
+
+    protected function descriptionText(DamageReport $report): string
+    {
+        return collect([(string) $report->description])
+            ->merge($report->affectedFamilyRecords->pluck('description')->all())
+            ->filter(fn (mixed $description): bool => trim((string) $description) !== '')
+            ->map(fn (mixed $description): string => trim((string) $description))
+            ->implode(' ');
+    }
+
+    protected function severityCounts(DamageReport $report): array
+    {
+        $counts = $this->emptySeverityBuckets();
+        $fallbackSeverity = $this->normalizedSeverity($report->damage_severity);
+
+        if ($report->affectedFamilyRecords->isEmpty()) {
+            $counts[$fallbackSeverity] = max(1, (int) $report->affected_families);
+
+            return $counts;
+        }
+
+        foreach ($report->affectedFamilyRecords as $family) {
+            $counts[$this->normalizedSeverity($family->damage_severity, $fallbackSeverity)]++;
+        }
+
+        return $counts;
+    }
+
+    protected function membersBySeverity(DamageReport $report, array $severityCounts): array
+    {
+        $members = $this->emptySeverityBuckets();
+        $fallbackSeverity = $this->normalizedSeverity($report->damage_severity);
+
+        foreach ($report->affectedFamilyRecords as $family) {
+            $severity = $this->normalizedSeverity($family->damage_severity, $fallbackSeverity);
+            $members[$severity] += max(0, (int) $family->household_members);
+        }
+
+        if (array_sum($members) > 0) {
+            return $members;
+        }
+
+        $defaultHouseholdSize = $this->settings->integer('recommendation_default_household_size');
+
+        foreach ($severityCounts as $severity => $count) {
+            $members[$severity] = $count * $defaultHouseholdSize;
+        }
+
+        return $members;
+    }
+
+    protected function combinedRecommendation(array $severityCounts, array $membersBySeverity, int $structures, string $effectiveSeverity): array
+    {
+        $baseline = [
+            'food_packs' => 0,
+            'medicine_kits' => 0,
+            'cash_assistance' => 0.0,
+        ];
+
+        foreach (['minor', 'moderate', 'severe'] as $severity) {
+            $families = (int) $severityCounts[$severity];
+
+            if ($families <= 0) {
+                continue;
+            }
+
+            $recommendation = match ($severity) {
+                'severe' => $this->severeRecommendation($families, (int) $membersBySeverity[$severity], 0),
+                'moderate' => $this->moderateRecommendation($families, (int) $membersBySeverity[$severity], 0),
+                default => $this->minorRecommendation($families, (int) $membersBySeverity[$severity], 0),
+            };
+
+            $baseline['food_packs'] += $recommendation['food_packs'];
+            $baseline['medicine_kits'] += $recommendation['medicine_kits'];
+            $baseline['cash_assistance'] += $recommendation['cash_assistance'];
+        }
+
+        $baseline['cash_assistance'] += $this->structureCashAssistance($structures, $effectiveSeverity);
+
+        return $baseline;
+    }
+
+    protected function structureCashAssistance(int $structures, string $severity): float
+    {
+        return (float) match ($severity) {
+            'severe' => $structures * $this->settings->integer('recommendation_cash_per_structure_severe'),
+            'moderate' => $structures * $this->settings->integer('recommendation_cash_per_structure_moderate'),
+            default => $structures * $this->settings->integer('recommendation_cash_per_structure_minor'),
+        };
+    }
+
+    protected function highestSeverity(array $severityCounts): string
+    {
+        foreach (['severe', 'moderate', 'minor'] as $severity) {
+            if (($severityCounts[$severity] ?? 0) > 0) {
+                return $severity;
+            }
+        }
+
+        return 'minor';
+    }
+
+    protected function normalizedSeverity(?string $severity, string $fallback = 'minor'): string
+    {
+        return in_array($severity, ['minor', 'moderate', 'severe'], true) ? $severity : $fallback;
+    }
+
+    protected function emptySeverityBuckets(): array
+    {
+        return [
+            'minor' => 0,
+            'moderate' => 0,
+            'severe' => 0,
+        ];
+    }
+
+    protected function severitySummary(array $severityCounts): string
+    {
+        return collect(['minor', 'moderate', 'severe'])
+            ->map(fn (string $severity): string => $severityCounts[$severity].' '.$severity)
+            ->implode(', ');
     }
 
     protected function severeRecommendation(int $families, int $members, int $structures): array
@@ -154,6 +285,7 @@ class DecisionTreeRecommendationService
         $foodMultiplier = 1.0;
         $medicineMultiplier = 1.0;
         $cashMultiplier = 1.0;
+        $medicalNeeds = false;
         $signals = [];
         $normalizedType = strtolower($disasterType);
         $normalizedDescription = strtolower($description);
@@ -173,8 +305,9 @@ class DecisionTreeRecommendationService
             $signals[] = 'description indicates evacuation or disrupted access';
         }
 
-        if ($this->containsAny($normalizedDescription, ['injur', 'wound', 'medical', 'medicine', 'hospital', 'sick'])) {
+        if ($this->containsAny($normalizedDescription, $this->medicalDescriptionTerms())) {
             $medicineMultiplier *= 1.25;
+            $medicalNeeds = true;
             $signals[] = 'description indicates medical needs';
         }
 
@@ -187,6 +320,28 @@ class DecisionTreeRecommendationService
             'food_multiplier' => $foodMultiplier,
             'medicine_multiplier' => $medicineMultiplier,
             'cash_multiplier' => $cashMultiplier,
+            'medical_needs' => $medicalNeeds,
+        ];
+    }
+
+    protected function medicalDescriptionTerms(): array
+    {
+        return [
+            'injur',
+            'wound',
+            'medical',
+            'medicine',
+            'hospital',
+            'sick',
+            'nasamdan',
+            'naangol',
+            'samad',
+            'medikal',
+            'pangmedikal',
+            'tambal',
+            'ospital',
+            'masakiton',
+            'nagsakit',
         ];
     }
 

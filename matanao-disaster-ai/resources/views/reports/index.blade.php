@@ -17,7 +17,7 @@
         <p class="muted">Dedicated module for geotagged disaster damage data, location-based monitoring, and response analytics.</p>
     </div>
     <div class="header-actions">
-        <a href="{{ route('reports.print') }}" class="btn btn-secondary">Open Printable Summary</a>
+        <a href="{{ route('reports.print') }}" class="btn btn-secondary">Open Printable Barangay List</a>
     </div>
 </div>
 

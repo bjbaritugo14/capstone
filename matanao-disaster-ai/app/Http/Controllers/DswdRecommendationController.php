@@ -21,10 +21,12 @@ class DswdRecommendationController extends Controller
             ->get()
             ->map(function (ResourceRecommendation $recommendation): array {
                 $report = $recommendation->report;
-                $families = $report?->affectedFamilyRecords->count() ?: ($report?->affected_families ?? 0);
-                $members = $report?->affectedFamilyRecords->sum('household_members') ?? 0;
+                $inputs = $recommendation->input_snapshot ?? [];
+                $familyRecordCount = $report?->affectedFamilyRecords->count() ?: ($report?->affected_families ?? 0);
+                $families = $inputs['affected_families'] ?? $familyRecordCount;
+                $members = $inputs['household_members'] ?? ($report?->affectedFamilyRecords->sum('household_members') ?? 0);
                 $latestValidation = $report?->validations->first();
-                $severity = $this->priority($report?->damage_severity);
+                $severity = $this->priorityLabel($inputs['priority'] ?? null, $inputs['damage_severity'] ?? $report?->damage_severity);
 
                 return [
                     'id' => 'REC-'.str_pad((string) $recommendation->recommendation_id, 4, '0', STR_PAD_LEFT),
@@ -42,7 +44,7 @@ class DswdRecommendationController extends Controller
                     'validated_by' => $latestValidation?->validator?->full_name ?? 'MDRRMO Validator',
                     'validated_at_label' => $this->formatTimestamp($latestValidation?->validated_at, 'Validation timestamp unavailable'),
                     'basis' => $recommendation->basis
-                        ?: $this->basis($report?->damage_severity, $families, $report?->affected_structures ?? 0),
+                        ?: $this->basis($inputs['damage_severity'] ?? $report?->damage_severity, $families, $report?->affected_structures ?? 0),
                 ];
             })
             ->values();
@@ -58,6 +60,16 @@ class DswdRecommendationController extends Controller
             'recommendations' => $recommendations->all(),
             'stats' => $stats,
         ]);
+    }
+
+    protected function priorityLabel(?string $priority, ?string $severity): string
+    {
+        return match ($priority) {
+            'high' => 'High',
+            'medium' => 'Medium',
+            'low' => 'Low',
+            default => $this->priority($severity),
+        };
     }
 
     protected function priority(?string $severity): string

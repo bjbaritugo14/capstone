@@ -6,42 +6,72 @@
     <title>Login | Matanao MDRRMO Assessment System</title>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 </head>
-<body class="auth-body">
+<body class="auth-body login-body">
     <section class="auth-shell">
         <div class="auth-panel auth-overview">
-            <div class="pill">Matanao MDRRMO</div>
-            <h1>Disaster Damage Assessment and Incident Monitoring System</h1>
-            <p class="muted">
-                Web-based system for geotagged disaster reporting,
-                GIS visualization, assistance recommendations, and vehicular accident monitoring.
-            </p>
+            <div class="auth-brand-row">
+                <div class="brand-mark auth-brand-mark">M</div>
+                <div>
+                    <strong>Matanao MDRRMO</strong>
+                    <span>Disaster response operations</span>
+                </div>
+            </div>
+
+            <div>
+                <div class="pill auth-pill">Command Center</div>
+                <h1>Disaster Damage Assessment and Incident Monitoring System</h1>
+                <p class="muted">
+                    Secure access for monitoring reports, validation activity, GIS records, and assistance recommendations.
+                </p>
+            </div>
+
+            <div class="auth-preview" aria-hidden="true">
+                <div class="auth-preview-top">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <div class="auth-map-preview">
+                    <span class="map-pin pin-one"></span>
+                    <span class="map-pin pin-two"></span>
+                    <span class="map-pin pin-three"></span>
+                </div>
+                <div class="auth-preview-stats">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
 
             <div class="auth-feature-list">
                 <div class="feature-card">
-                    <strong>Web Report Encoding</strong>
-                    <p>Disaster reports and accident incidents with geotagged location and photo documentation.</p>
+                    <strong>Field Reports</strong>
+                    <p>Geotagged disaster and accident records with field validation support.</p>
                 </div>
                 <div class="feature-card">
-                    <strong>Web-GIS Monitoring</strong>
-                    <p>Mapped incidents, validation workflow, and barangay-based impact tracking.</p>
+                    <strong>GIS Monitoring</strong>
+                    <p>Barangay-level map views for incidents, impact areas, and response tracking.</p>
                 </div>
                 <div class="feature-card">
                     <strong>Decision Support</strong>
-                    <p>Decision Tree-based recommendations for cash assistance, food packs, and medicines.</p>
+                    <p>Assistance recommendations based on validated impact and household data.</p>
                 </div>
             </div>
         </div>
 
         <div class="card auth-card">
-            <div class="section-heading compact-heading">
+            <div class="auth-card-header">
+                <div class="auth-lock-mark" aria-hidden="true">
+                    <span></span>
+                </div>
                 <div>
                     <h2>Authorized Login</h2>
                     <p class="muted">Sign in with an active account from the database.</p>
                 </div>
-                <span class="badge badge-blue">Live Data</span>
+                <span class="badge badge-blue">Secure Access</span>
             </div>
 
-            <form method="POST" action="{{ route('login.store') }}" class="form-grid">
+            <form method="POST" action="{{ route('login.store') }}" class="form-grid auth-login-form">
                 @csrf
                 @if(session('status'))
                     <div class="form-success">{{ session('status') }}</div>
@@ -49,17 +79,24 @@
                 @if ($errors->any())
                     <div class="form-error">{{ $errors->first() }}</div>
                 @endif
-                <div>
-                    <label>Email</label>
-                    <input type="email" name="email" value="{{ old('email') }}" placeholder="admin@example.com" required>
+                <div class="auth-field">
+                    <label for="email">Email address</label>
+                    <div class="input-shell">
+                        <span class="field-icon" aria-hidden="true">ID</span>
+                        <input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="admin@example.com" autocomplete="email" required autofocus>
+                    </div>
                 </div>
-                <div>
-                    <label>Password</label>
-                    <input type="password" name="password" placeholder="Password" required>
+                <div class="auth-field">
+                    <label for="password">Password</label>
+                    <div class="input-shell">
+                        <span class="field-icon" aria-hidden="true">PW</span>
+                        <input id="password" type="password" name="password" placeholder="Password" autocomplete="current-password" required data-password-input>
+                        <button type="button" class="password-toggle" data-password-toggle>Show</button>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Sign In</button>
-                <div style="text-align: center; margin-top: 4px;">
-                    <a href="{{ route('password.request') }}" style="color: var(--primary); font-size: 14px;">Forgot your password?</a>
+                <button type="submit" class="btn btn-primary auth-submit">Sign In</button>
+                <div class="auth-form-footer">
+                    <a href="{{ route('password.request') }}">Forgot your password?</a>
                 </div>
             </form>
 
@@ -79,5 +116,17 @@
             </div>
         </div>
     </section>
+    <script>
+        (() => {
+            const input = document.querySelector('[data-password-input]');
+            const toggle = document.querySelector('[data-password-toggle]');
+
+            toggle?.addEventListener('click', () => {
+                const isHidden = input?.type === 'password';
+                input.type = isHidden ? 'text' : 'password';
+                toggle.textContent = isHidden ? 'Hide' : 'Show';
+            });
+        })();
+    </script>
 </body>
 </html>

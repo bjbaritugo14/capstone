@@ -19,17 +19,21 @@ class RecommendationController extends Controller
             ->whereHas('report', fn ($query) => $query->where('status', 'validated'))
             ->latest('generated_at')
             ->get()
-            ->map(fn (ResourceRecommendation $recommendation) => [
-                'barangay' => $recommendation->barangay?->barangay_name ?? 'Unassigned',
-                'report' => 'REP-'.str_pad((string) $recommendation->report_id, 4, '0', STR_PAD_LEFT),
-                'families' => $recommendation->report?->affected_families ?? 0,
-                'food_packs' => $recommendation->food_packs,
-                'medical_kits' => $recommendation->medicine_kits,
-                'cash_assistance' => $recommendation->cash_assistance,
-                'priority' => $this->priority($recommendation->report?->damage_severity),
-                'rule' => $recommendation->basis
-                    ?: $this->rule($recommendation->report?->damage_severity, $recommendation->report?->affected_families ?? 0),
-            ])
+            ->map(function (ResourceRecommendation $recommendation): array {
+                $inputs = $recommendation->input_snapshot ?? [];
+
+                return [
+                    'barangay' => $recommendation->barangay?->barangay_name ?? 'Unassigned',
+                    'report' => 'REP-'.str_pad((string) $recommendation->report_id, 4, '0', STR_PAD_LEFT),
+                    'families' => $inputs['affected_families'] ?? $recommendation->report?->affected_families ?? 0,
+                    'food_packs' => $recommendation->food_packs,
+                    'medical_kits' => $recommendation->medicine_kits,
+                    'cash_assistance' => $recommendation->cash_assistance,
+                    'priority' => $this->priorityLabel($inputs['priority'] ?? null, $inputs['damage_severity'] ?? $recommendation->report?->damage_severity),
+                    'rule' => $recommendation->basis
+                        ?: $this->rule($inputs['damage_severity'] ?? $recommendation->report?->damage_severity, $inputs['affected_families'] ?? $recommendation->report?->affected_families ?? 0),
+                ];
+            })
             ->all();
 
         $reportsForGeneration = DamageReport::query()
@@ -92,6 +96,16 @@ class RecommendationController extends Controller
         return redirect()
             ->route('recommendations.index')
             ->with('status', 'Recommendation generated using '.$source.'. '.$result['basis']);
+    }
+
+    protected function priorityLabel(?string $priority, ?string $severity): string
+    {
+        return match ($priority) {
+            'high' => 'High',
+            'medium' => 'Medium',
+            'low' => 'Low',
+            default => $this->priority($severity),
+        };
     }
 
     protected function priority(?string $severity): string

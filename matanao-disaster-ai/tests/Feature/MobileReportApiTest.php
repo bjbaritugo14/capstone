@@ -119,6 +119,49 @@ class MobileReportApiTest extends TestCase
         ]);
     }
 
+    public function test_mobile_report_rejects_unrealistic_affected_structure_count(): void
+    {
+        $user = $this->createFieldUser();
+        Barangay::create([
+            'barangay_name' => 'Asbang',
+            'municipality' => 'Matanao',
+            'province' => 'Davao del Sur',
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/reports', [
+            'barangay' => 'Asbang',
+            'purok' => 'Purok 1',
+            'description' => 'Flood response needed.',
+            'disasterType' => 'Flood',
+            'severity' => 'minor',
+            'affectedStructures' => 9668272173,
+            'reportDate' => '2026-09-03',
+            'latitude' => '6.706258',
+            'longitude' => '125.218819',
+            'families' => [
+                [
+                    'familyHeadName' => 'Juan Kalo',
+                    'householdMembers' => 2,
+                    'contactNumber' => '09668272173',
+                    'evacuationStatus' => 'Returned Home',
+                    'description' => 'One of the members is injured.',
+                    'severity' => 'minor',
+                    'latitude' => '6.706258',
+                    'longitude' => '125.218819',
+                ],
+            ],
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['affectedStructures']);
+
+        $this->assertDatabaseCount('disaster_reports', 0);
+    }
+
     private function createFieldUser(): User
     {
         $role = Role::create(['role_name' => 'field_officer']);

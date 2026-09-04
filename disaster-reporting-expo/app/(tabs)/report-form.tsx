@@ -86,7 +86,10 @@ export default function ReportFormScreen() {
   useEffect(() => {
     if (existingReport) {
       const { id, status, validationRemarks, validatedAt, validatedBy, createdAt, ...payload } = existingReport;
-      setForm(payload);
+      setForm({
+        ...payload,
+        affectedStructures: payload.families.length,
+      });
     } else {
       setForm(buildEmptyForm());
     }
@@ -132,9 +135,11 @@ export default function ReportFormScreen() {
   };
 
   const addFamily = () => {
+    const updated = [...form.families, buildEmptyFamily()];
     setForm((current) => ({
       ...current,
-      families: [...current.families, buildEmptyFamily()],
+      families: updated,
+      affectedStructures: updated.length,
     }));
   };
 
@@ -146,9 +151,11 @@ export default function ReportFormScreen() {
   };
 
   const removeFamily = (index: number) => {
+    const updated = form.families.filter((_, familyIndex) => familyIndex !== index);
     setForm((current) => ({
       ...current,
-      families: current.families.filter((_, familyIndex) => familyIndex !== index),
+      families: updated,
+      affectedStructures: updated.length,
     }));
   };
 
@@ -214,11 +221,6 @@ export default function ReportFormScreen() {
       return;
     }
 
-    if (!Number.isInteger(form.affectedStructures) || form.affectedStructures < 0) {
-      Alert.alert('Invalid structures', 'Affected structures must be a whole number of zero or more.');
-      return;
-    }
-
     const familyWithCoordinates = form.families.find((family) => hasValidCoordinates(family.latitude, family.longitude));
     const hasMapLocation = Boolean(familyWithCoordinates) || hasValidCoordinates(form.latitude, form.longitude);
 
@@ -234,6 +236,7 @@ export default function ReportFormScreen() {
       latitude: familyWithCoordinates?.latitude || form.latitude,
       longitude: familyWithCoordinates?.longitude || form.longitude,
       photos: form.families.flatMap((family) => family.photos || []),
+      affectedStructures: form.families.length,
     };
 
     try {
@@ -286,15 +289,6 @@ export default function ReportFormScreen() {
           </Picker>
         </View>
 
-        <Text style={styles.sectionTitle}>Affected Structures</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Number of damaged or affected structures"
-          keyboardType="number-pad"
-          value={String(form.affectedStructures)}
-          onChangeText={(value) => setField('affectedStructures', Number(value || 0))}
-        />
-
         <Text style={styles.sectionTitle}>Date</Text>
         <TextInput
           style={styles.input}
@@ -313,6 +307,7 @@ export default function ReportFormScreen() {
         <Text style={styles.sectionTitle}>Affected Families</Text>
         <Text style={styles.mutedText}>
           Each family entry includes its own description, severity, location, and photos.
+          Affected structures: {form.families.length}
         </Text>
         <Text style={styles.mutedText}>
           Capture GPS coordinates for at least one affected family so the report appears correctly on the GIS map.

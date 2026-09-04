@@ -42,7 +42,9 @@ class OllamaRecommendationService
 
             return [
                 'food_packs' => max(0, (int) ($payload['food_packs'] ?? $fallback['food_packs'])),
-                'medicine_kits' => max(0, (int) ($payload['medicine_kits'] ?? $fallback['medicine_kits'])),
+                'medicine_kits' => $fallback['inputs']['medical_needs']
+                    ? max(0, (int) ($payload['medicine_kits'] ?? $fallback['medicine_kits']))
+                    : 0,
                 'cash_assistance' => max(0, (float) ($payload['cash_assistance'] ?? $fallback['cash_assistance'])),
                 'basis' => $fallback['basis'].' Ollama refinement: '.(string) ($payload['basis'] ?? 'No additional explanation provided.'),
                 'source' => 'ollama',
@@ -57,9 +59,12 @@ class OllamaRecommendationService
     {
         $report->loadMissing(['location.barangay', 'affectedFamilyRecords']);
 
-        $familyCount = $report->affectedFamilyRecords->count() ?: $report->affected_families;
-        $householdMembers = $report->affectedFamilyRecords->sum('household_members');
         $base = $this->decisionTree->generate($report);
+        $familyCount = $base['inputs']['affected_families'];
+        $householdMembers = $base['inputs']['household_members'];
+        $severityCounts = json_encode($base['inputs']['severity_counts']);
+        $effectiveSeverity = $base['inputs']['damage_severity'];
+        $outputScope = $base['inputs']['output_scope'];
 
         return <<<PROMPT
 You are an MDRRMO and DSWD relief recommendation assistant for Matanao, Davao del Sur.
@@ -75,10 +80,12 @@ Return only valid JSON with these exact keys:
 Use conservative, practical relief values. Base the recommendation on:
 - Barangay: {$report->location?->barangay?->barangay_name}
 - Disaster type: {$report->disaster_type}
-- Severity: {$report->damage_severity}
+- Effective severity: {$effectiveSeverity}
+- Affected-family severity counts: {$severityCounts}
 - Affected families: {$familyCount}
 - Household members: {$householdMembers}
 - Affected structures: {$report->affected_structures}
+- Output scope: {$outputScope}
 - Description: {$report->description}
 
 Base Decision Tree result:
@@ -89,8 +96,10 @@ Base Decision Tree result:
 Rules:
 - Use the Decision Tree result as the baseline.
 - You may slightly adjust values only if the description clearly supports it.
+- If medical-needs words are present, keep food_packs and cash_assistance from the Decision Tree baseline while preserving the medicine-kit increase.
+- If medical-needs words are not present in the description, medicine_kits must be 0.
 - Food packs should generally be at least one per affected family.
-- Medicine kits should increase for moderate or severe incidents.
+- Medicine kits should increase for moderate or severe incidents only when medical-needs words are present.
 - Cash assistance should increase with severity and affected structures.
 - Do not include markdown.
 PROMPT;
