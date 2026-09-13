@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AffectedFamily;
 use App\Models\DamageReport;
 use App\Models\ResourceRecommendation;
 use App\Models\VehicularAccident;
@@ -11,7 +12,7 @@ class DashboardController extends Controller
 {
     public function index(): View
     {
-        $reports = DamageReport::query()->with(['location.barangay'])->get();
+        $reports = DamageReport::query()->with(['location.barangay', 'affectedFamilyRecords'])->get();
         $accidents = VehicularAccident::query()->with(['location.barangay'])->get();
 
         $stats = [
@@ -59,6 +60,19 @@ class DashboardController extends Controller
                 'lat' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->latitude : null,
                 'lng' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->longitude : null,
                 'incident_type' => 'Disaster Report',
+                'kind' => 'disaster',
+                'family_points' => $report->affectedFamilyRecords
+                    ->filter(fn (AffectedFamily $family): bool => $this->hasCoordinates($family->latitude, $family->longitude))
+                    ->map(fn (AffectedFamily $family): array => [
+                        'name' => $family->family_head_name,
+                        'household_members' => (int) $family->household_members,
+                        'evacuation_status' => $family->evacuation_status ?: 'Not specified',
+                        'severity' => $this->severityLabel($family->damage_severity ?: $report->damage_severity),
+                        'lat' => (float) $family->latitude,
+                        'lng' => (float) $family->longitude,
+                    ])
+                    ->values()
+                    ->all(),
                 'sort_date' => $report->incident_datetime,
             ]);
 
@@ -74,6 +88,8 @@ class DashboardController extends Controller
                 'lat' => $this->hasCoordinates($accident->location?->latitude, $accident->location?->longitude) ? (float) $accident->location->latitude : null,
                 'lng' => $this->hasCoordinates($accident->location?->latitude, $accident->location?->longitude) ? (float) $accident->location->longitude : null,
                 'incident_type' => 'Vehicular Accident',
+                'kind' => 'accident',
+                'family_points' => [],
                 'sort_date' => $accident->incident_datetime,
             ]);
 
@@ -104,21 +120,45 @@ class DashboardController extends Controller
 
         $mapCenter = ['lat' => 6.688099, 'lng' => 125.166607];
 
-        $mapPoints = array_values(array_filter(array_map(function (array $report) {
-            if ($report['lat'] === null || $report['lng'] === null) {
-                return null;
-            }
+        $mapPoints = collect($recentReports)
+            ->flatMap(function (array $report): array {
+                $points = [];
 
-            return [
-                'code' => $report['code'],
-                'barangay' => $report['barangay'],
-                'severity' => $report['severity'],
-                'status' => $report['status'],
-                'incident_type' => $report['incident_type'],
-                'lat' => $report['lat'],
-                'lng' => $report['lng'],
-            ];
-        }, $recentReports)));
+                if ($report['lat'] === null || $report['lng'] === null) {
+                    return $points;
+                }
+
+                $points[] = [
+                    'kind' => $report['kind'],
+                    'code' => $report['code'],
+                    'barangay' => $report['barangay'],
+                    'severity' => $report['severity'],
+                    'status' => $report['status'],
+                    'incident_type' => $report['incident_type'],
+                    'lat' => $report['lat'],
+                    'lng' => $report['lng'],
+                ];
+
+                foreach ($report['family_points'] as $familyPoint) {
+                    $points[] = [
+                        'kind' => 'family_pin',
+                        'code' => $report['code'],
+                        'barangay' => $report['barangay'],
+                        'severity' => $familyPoint['severity'],
+                        'status' => $report['status'],
+                        'incident_type' => 'Affected Family',
+                        'name' => $familyPoint['name'],
+                        'household_members' => $familyPoint['household_members'],
+                        'evacuation_status' => $familyPoint['evacuation_status'],
+                        'lat' => $familyPoint['lat'],
+                        'lng' => $familyPoint['lng'],
+                    ];
+                }
+
+                return $points;
+            })
+            ->values()
+            ->all();
 
         return view('dashboard', compact(
             'stats',

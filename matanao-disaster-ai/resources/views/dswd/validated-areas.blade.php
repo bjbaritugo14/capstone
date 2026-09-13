@@ -53,6 +53,11 @@
         <div class="map-shell">
             <div id="validated-areas-map" class="map-canvas" aria-label="Validated affected areas GIS map"></div>
         </div>
+        <div class="map-severity-legend" aria-label="Map legend">
+            <span><i class="map-severity-dot low"></i><span class="badge badge-green">Low</span></span>
+            <span><i class="map-severity-dot medium"></i><span class="badge badge-amber">Medium</span></span>
+            <span><i class="map-severity-dot high"></i><span class="badge badge-red">High</span></span>
+        </div>
 
         <div class="top-gap">
             <div class="mini-grid">
@@ -231,34 +236,53 @@
     }).addTo(map);
 
     const bounds = [];
+    const severityStyles = {
+        Low: { stroke: '#166534', fill: '#22c55e', badge: 'badge-green' },
+        Medium: { stroke: '#b45309', fill: '#f59e0b', badge: 'badge-amber' },
+        High: { stroke: '#b91c1c', fill: '#ef4444', badge: 'badge-red' },
+    };
+
+    function severityStyle(severity) {
+        return severityStyles[severity] || severityStyles.Low;
+    }
 
     mapPoints.forEach((point) => {
         let layer;
+        const style = severityStyle(point.severity);
 
         if (point.kind === 'family_pin') {
             layer = L.circleMarker([point.lat, point.lng], {
-                radius: 6,
-                color: '#1d4ed8',
-                fillColor: '#60a5fa',
-                fillOpacity: 0.9,
-                weight: 2,
+                radius: 10,
+                color: style.stroke,
+                fillColor: style.fill,
+                fillOpacity: 0.95,
+                weight: 3,
             });
         } else {
-            const stroke = point.severity === 'High' ? '#991b1b' : (point.severity === 'Medium' ? '#9a3412' : '#166534');
-            const fill = point.severity === 'High' ? '#ef4444' : (point.severity === 'Medium' ? '#f59e0b' : '#22c55e');
-
             layer = L.circleMarker([point.lat, point.lng], {
-                radius: 10,
-                color: stroke,
-                fillColor: fill,
-                fillOpacity: 0.82,
+                radius: point.severity === 'High' ? 11 : 9,
+                color: style.stroke,
+                fillColor: style.fill,
+                fillOpacity: 0.86,
                 weight: 2,
             });
         }
 
         layer.addTo(map).bindPopup(
-            `<strong>${point.title}</strong><br>${point.subtitle}<br>${point.note}<br>${point.coordinates}`
+            `<strong class="map-popup-title">${point.title}</strong>
+            <div class="map-popup-line">${point.subtitle}</div>
+            <div class="map-popup-line">${point.note}</div>
+            <div class="map-popup-line">${point.coordinates}</div>
+            <div class="map-popup-badges">
+                <span class="badge ${style.badge}">${point.severity}</span>
+                ${point.kind === 'family_pin' ? '<span class="badge badge-blue">Family Pin</span>' : '<span class="badge badge-green">Validated Area</span>'}
+            </div>`
         );
+
+        if (point.kind === 'family_pin') {
+            layer.on('mouseover', () => layer.openPopup());
+            layer.bringToFront();
+        }
 
         bounds.push([point.lat, point.lng]);
     });

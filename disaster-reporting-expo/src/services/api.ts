@@ -2,9 +2,10 @@ import { mockApi } from '../mocks/mockApi';
 import { BarangayOption, Report, ReportPayload, User, VehicularAccident, VehicularAccidentPayload } from '../types';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://192.168.1.50:8000/api';
-const USE_MOCK_API = false; // Hardcoded to use real API
+const USE_REAL_API = process.env.EXPO_PUBLIC_USE_REAL_API !== 'false';
+const USE_MOCK_API = !USE_REAL_API;
 
-console.log('[API] Using real API at:', API_BASE_URL);
+console.log(`[API] Using ${USE_MOCK_API ? 'mock API' : 'real API'} at:`, API_BASE_URL);
 
 async function request<T>(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -311,6 +312,8 @@ export const api = {
     formData.append('barangay', payload.barangay);
     formData.append('purok', payload.purok || '');
     formData.append('roadSegment', payload.roadSegment || '');
+    formData.append('personFirstName', payload.personFirstName || '');
+    formData.append('personLastName', payload.personLastName || '');
     formData.append('personName', payload.personName || '');
     formData.append('accidentType', payload.accidentType);
     formData.append('vehicleType', payload.vehicleType || '');
@@ -375,6 +378,8 @@ export const api = {
     formData.append('barangay', payload.barangay);
     formData.append('purok', payload.purok || '');
     formData.append('roadSegment', payload.roadSegment || '');
+    formData.append('personFirstName', payload.personFirstName || '');
+    formData.append('personLastName', payload.personLastName || '');
     formData.append('personName', payload.personName || '');
     formData.append('accidentType', payload.accidentType);
     formData.append('vehicleType', payload.vehicleType || '');

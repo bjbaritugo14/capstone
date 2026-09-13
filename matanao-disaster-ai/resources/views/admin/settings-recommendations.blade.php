@@ -24,7 +24,7 @@
     <div class="section-heading">
         <div>
             <h2>Recommendation Rules</h2>
-            <p class="muted">Decision Tree remains the primary algorithm. These settings control assistance computation and whether optional Ollama refinement is allowed.</p>
+            <p class="muted">Decision Tree remains the primary algorithm. Food packs use fixed household-size rules; these settings control medicine, cash, thresholds, and optional Ollama refinement.</p>
         </div>
     </div>
 
@@ -42,19 +42,6 @@
         <div>
             <label>Default Household Size</label>
             <input type="number" name="recommendation_default_household_size" min="1" value="{{ old('recommendation_default_household_size', $settings['recommendation_default_household_size']) }}" required>
-        </div>
-
-        <div>
-            <label>Minor Food Multiplier</label>
-            <input type="number" step="0.1" min="0.1" name="recommendation_food_multiplier_minor" value="{{ old('recommendation_food_multiplier_minor', $settings['recommendation_food_multiplier_minor']) }}" required>
-        </div>
-        <div>
-            <label>Moderate Food Multiplier</label>
-            <input type="number" step="0.1" min="0.1" name="recommendation_food_multiplier_moderate" value="{{ old('recommendation_food_multiplier_moderate', $settings['recommendation_food_multiplier_moderate']) }}" required>
-        </div>
-        <div>
-            <label>Severe Food Multiplier</label>
-            <input type="number" step="0.1" min="0.1" name="recommendation_food_multiplier_severe" value="{{ old('recommendation_food_multiplier_severe', $settings['recommendation_food_multiplier_severe']) }}" required>
         </div>
 
         <div>

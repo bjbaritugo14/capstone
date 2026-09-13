@@ -37,7 +37,8 @@ class MobileReportApiTest extends TestCase
             'reportDate' => '2026-07-14',
             'families' => [
                 [
-                    'familyHeadName' => 'Juan Dela Cruz',
+                    'firstName' => 'Juan',
+                    'lastName' => 'Dela Cruz',
                     'householdMembers' => 4,
                     'contactNumber' => '09123456789',
                     'evacuationStatus' => 'Evacuated',
@@ -94,7 +95,8 @@ class MobileReportApiTest extends TestCase
             'reportDate' => '2026-07-15',
             'families' => [
                 [
-                    'familyHeadName' => 'Juan Dela Cruz',
+                    'firstName' => 'Juan',
+                    'lastName' => 'Dela Cruz',
                     'householdMembers' => 4,
                     'contactNumber' => '09123456789',
                     'evacuationStatus' => 'Evacuated',
@@ -109,6 +111,9 @@ class MobileReportApiTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('status', 'pending')
+            ->assertJsonPath('families.0.firstName', 'Juan')
+            ->assertJsonPath('families.0.lastName', 'Dela Cruz')
+            ->assertJsonPath('families.0.familyHeadName', 'Juan Dela Cruz')
             ->assertJsonPath('validationRemarks', '');
 
         $this->assertDatabaseHas('disaster_reports', [

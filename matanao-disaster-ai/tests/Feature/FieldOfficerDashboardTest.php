@@ -62,7 +62,8 @@ class FieldOfficerDashboardTest extends TestCase
                 'longitude' => '125.166607',
                 'families' => [
                     [
-                        'familyHeadName' => 'Juan Dela Cruz',
+                        'firstName' => 'Juan',
+                        'lastName' => 'Dela Cruz',
                         'householdMembers' => 4,
                         'contactNumber' => '09123456789',
                         'evacuationStatus' => 'Evacuated',
@@ -86,6 +87,10 @@ class FieldOfficerDashboardTest extends TestCase
             'affected_structures' => 5,
             'status' => 'pending',
         ]);
+        $this->assertDatabaseHas('affected_families', [
+            'family_head_name' => 'Juan Dela Cruz',
+            'household_members' => 4,
+        ]);
     }
 
     public function test_validator_cannot_submit_through_the_field_officer_route(): void
@@ -97,6 +102,60 @@ class FieldOfficerDashboardTest extends TestCase
             ->withSession(['role' => 'validator'])
             ->post(route('field-officer.reports.store'))
             ->assertForbidden();
+    }
+
+    public function test_field_officer_can_submit_an_accident_report_with_split_names(): void
+    {
+        $barangay = Barangay::create([
+            'barangay_name' => 'Asbang',
+            'municipality' => 'Matanao',
+            'province' => 'Davao del Sur',
+            'status' => 'active',
+        ]);
+        $fieldOfficer = $this->createUserForRole('field_officer', 'field-accident@example.com', 'Field Officer');
+
+        $response = $this
+            ->actingAs($fieldOfficer)
+            ->withSession(['role' => 'field_officer'])
+            ->post(route('field-officer.accidents.store'), [
+                'barangay_id' => $barangay->barangay_id,
+                'purok' => 'Purok 1',
+                'roadSegment' => 'National Highway',
+                'accidentType' => 'Collision',
+                'vehicleType' => 'Motorcycle',
+                'description' => 'Two motorcycles collided.',
+                'vehiclesInvolved' => 2,
+                'injuredCount' => 1,
+                'fatalityCount' => 0,
+                'incidentDate' => '2026-07-08',
+                'latitude' => '6.688099',
+                'longitude' => '125.166607',
+                'involvedPersons' => [
+                    [
+                        'firstName' => 'Juan',
+                        'lastName' => 'Dela Cruz',
+                        'role' => 'Driver',
+                        'contactNumber' => '09123456789',
+                    ],
+                ],
+            ]);
+
+        $response
+            ->assertRedirect(route('field-officer.dashboard'))
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseHas('vehicular_accidents', [
+            'user_id' => $fieldOfficer->user_id,
+            'involved_person_name' => 'Juan Dela Cruz',
+            'involved_person_first_name' => 'Juan',
+            'involved_person_last_name' => 'Dela Cruz',
+            'status' => 'recorded',
+        ]);
+        $this->assertDatabaseHas('accident_involved_persons', [
+            'person_name' => 'Juan Dela Cruz',
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+        ]);
     }
 
     private function createUserForRole(string $roleName, string $email, string $fullName): User

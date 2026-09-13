@@ -41,7 +41,7 @@ class OllamaRecommendationService
             }
 
             return [
-                'food_packs' => max(0, (int) ($payload['food_packs'] ?? $fallback['food_packs'])),
+                'food_packs' => $fallback['food_packs'],
                 'medicine_kits' => $fallback['inputs']['medical_needs']
                     ? max(0, (int) ($payload['medicine_kits'] ?? $fallback['medicine_kits']))
                     : 0,
@@ -95,10 +95,11 @@ Base Decision Tree result:
 
 Rules:
 - Use the Decision Tree result as the baseline.
-- You may slightly adjust values only if the description clearly supports it.
+- food_packs must stay exactly {$base['food_packs']}.
+- You may slightly adjust medicine_kits or cash_assistance only if the description clearly supports it.
 - If medical-needs words are present, keep food_packs and cash_assistance from the Decision Tree baseline while preserving the medicine-kit increase.
 - If medical-needs words are not present in the description, medicine_kits must be 0.
-- Food packs should generally be at least one per affected family.
+- Food packs are fixed by family rule: severe family = 3 packs; otherwise more than 8 household members = 3 packs; more than 4 household members = 2 packs; otherwise 1 pack.
 - Medicine kits should increase for moderate or severe incidents only when medical-needs words are present.
 - Cash assistance should increase with severity and affected structures.
 - Do not include markdown.

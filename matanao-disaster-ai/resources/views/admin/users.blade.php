@@ -67,7 +67,7 @@
             </div>
         </div>
         <div class="timeline-list">
-            <div class="timeline-item"><span>1</span><p>Admin creates all MDRRMO, DSWD, and validator accounts.</p></div>
+            <div class="timeline-item"><span>1</span><p>Admin creates MDRRMO, DSWD, and field officer accounts.</p></div>
             <div class="timeline-item"><span>2</span><p>Admin can reset a user's password if the user forgets it.</p></div>
             <div class="timeline-item"><span>3</span><p>Inactive accounts cannot log in.</p></div>
         </div>

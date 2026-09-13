@@ -157,9 +157,6 @@ class SystemSettingsController extends Controller
         return [
             'recommendation_use_ollama_assistance' => ['required', 'boolean'],
             'recommendation_default_household_size' => ['required', 'integer', 'min:1'],
-            'recommendation_food_multiplier_minor' => ['required', 'numeric', 'min:0.1'],
-            'recommendation_food_multiplier_moderate' => ['required', 'numeric', 'min:0.1'],
-            'recommendation_food_multiplier_severe' => ['required', 'numeric', 'min:0.1'],
             'recommendation_medicine_divisor_minor' => ['required', 'integer', 'min:1'],
             'recommendation_medicine_divisor_moderate' => ['required', 'integer', 'min:1'],
             'recommendation_medicine_divisor_severe' => ['required', 'integer', 'min:1'],

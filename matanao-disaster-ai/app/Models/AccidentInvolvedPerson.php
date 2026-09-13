@@ -16,6 +16,8 @@ class AccidentInvolvedPerson extends Model
     protected $fillable = [
         'accident_id',
         'person_name',
+        'first_name',
+        'last_name',
         'role',
         'contact_number',
         'created_at',

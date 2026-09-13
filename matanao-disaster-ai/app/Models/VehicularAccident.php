@@ -21,6 +21,8 @@ class VehicularAccident extends Model
         'accident_type',
         'vehicle_type',
         'involved_person_name',
+        'involved_person_first_name',
+        'involved_person_last_name',
         'description',
         'vehicles_involved',
         'injured_count',

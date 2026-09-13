@@ -58,6 +58,30 @@ class ReportPrintTest extends TestCase
             ->assertDontSee('Saub | Landslide');
     }
 
+    public function test_print_page_allocates_medical_kits_only_to_families_with_medical_descriptions(): void
+    {
+        $user = $this->createMdrrmoUser();
+        $barangay = $this->createBarangay('Sampaguita');
+        $report = $this->createReport($user, $barangay, 'Flood', 'Injured one person');
+
+        $this->createFamily($report, 'Bryan barz', 2, 'minor', 'Injured one person', 'Returned Home', '06464683');
+        $this->createFamily($report, 'Ryan beng', 4, 'severe', 'House got sweep by the flood', 'In Evacuation Center', '06465683');
+        $this->createFamily($report, 'Bryan youan', 5, 'moderate', 'House got a water', 'In Evacuation Center', '0616838');
+        $this->createRecommendation($user, $barangay, $report, 6, 5250, 2);
+
+        $response = $this
+            ->actingAs($user)
+            ->withSession(['role' => 'mdrrmo'])
+            ->get(route('reports.print', ['barangay_id' => $barangay->barangay_id]));
+
+        $response
+            ->assertOk()
+            ->assertSee('2 medical kits')
+            ->assertSeeInOrder(['Bryan barz', 'Returned Home', 'Low', '1', '2', 'Php 750.00'])
+            ->assertSeeInOrder(['Ryan beng', 'In Evacuation Center', 'High', '3', '0', 'Php 3,000.00'])
+            ->assertSeeInOrder(['Bryan youan', 'In Evacuation Center', 'Medium', '2', '0', 'Php 1,500.00']);
+    }
+
     private function createMdrrmoUser(): User
     {
         $role = Role::create(['role_name' => 'mdrrmo']);
@@ -81,7 +105,7 @@ class ReportPrintTest extends TestCase
         ]);
     }
 
-    private function createReport(User $user, Barangay $barangay, string $disasterType): DamageReport
+    private function createReport(User $user, Barangay $barangay, string $disasterType, string $description = 'Printable test report.'): DamageReport
     {
         $location = IncidentLocation::create([
             'barangay_id' => $barangay->barangay_id,
@@ -95,7 +119,7 @@ class ReportPrintTest extends TestCase
             'user_id' => $user->user_id,
             'location_id' => $location->location_id,
             'disaster_type' => $disasterType,
-            'description' => 'Printable test report.',
+            'description' => $description,
             'damage_severity' => 'moderate',
             'affected_families' => 2,
             'affected_structures' => 1,
@@ -105,14 +129,23 @@ class ReportPrintTest extends TestCase
         ]);
     }
 
-    private function createFamily(DamageReport $report, string $name, int $members, ?string $severity = null): void
+    private function createFamily(
+        DamageReport $report,
+        string $name,
+        int $members,
+        ?string $severity = null,
+        ?string $description = null,
+        string $evacuationStatus = 'Evacuated',
+        string $contactNumber = '09123456789',
+    ): void
     {
         AffectedFamily::create([
             'report_id' => $report->report_id,
             'family_head_name' => $name,
             'household_members' => $members,
-            'contact_number' => '09123456789',
-            'evacuation_status' => 'Evacuated',
+            'contact_number' => $contactNumber,
+            'evacuation_status' => $evacuationStatus,
+            'description' => $description,
             'damage_severity' => $severity,
             'created_at' => now(),
         ]);

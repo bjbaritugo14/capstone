@@ -45,14 +45,24 @@ class MobileVehicularAccidentController extends Controller
         $barangay = $this->barangayFromPayload($validated);
         $location = $this->createLocation($validated, $barangay);
 
-        $involvedPersons = $validated['involvedPersons'] ?? [];
+        $primaryPerson = $this->normalizedPersonName(
+            $validated['personFirstName'] ?? null,
+            $validated['personLastName'] ?? null,
+            $validated['personName'] ?? null,
+        );
+        $involvedPersons = $this->normalizedPersonRows($validated['involvedPersons'] ?? []);
+        if ($primaryPerson['personName'] === '' && $involvedPersons !== []) {
+            $primaryPerson = $involvedPersons[0];
+        }
 
         $accident = VehicularAccident::create([
             'user_id' => $request->user()->user_id,
             'location_id' => $location->location_id,
             'accident_type' => $validated['accidentType'],
             'vehicle_type' => $validated['vehicleType'] ?? null,
-            'involved_person_name' => $validated['personName'] ?? null,
+            'involved_person_name' => $primaryPerson['personName'] ?: null,
+            'involved_person_first_name' => $primaryPerson['firstName'] ?: null,
+            'involved_person_last_name' => $primaryPerson['lastName'] ?: null,
             'description' => $validated['description'],
             'vehicles_involved' => $validated['vehiclesInvolved'] ?? 1,
             'injured_count' => $validated['injuredCount'] ?? 0,
@@ -65,6 +75,8 @@ class MobileVehicularAccidentController extends Controller
             AccidentInvolvedPerson::create([
                 'accident_id' => $accident->accident_id,
                 'person_name' => $person['personName'],
+                'first_name' => $person['firstName'],
+                'last_name' => $person['lastName'],
                 'role' => $person['role'] ?? null,
                 'contact_number' => $person['contactNumber'] ?? null,
             ]);
@@ -101,6 +113,15 @@ class MobileVehicularAccidentController extends Controller
 
         $validated = $this->validated($request);
         $barangay = $this->barangayFromPayload($validated);
+        $primaryPerson = $this->normalizedPersonName(
+            $validated['personFirstName'] ?? null,
+            $validated['personLastName'] ?? null,
+            $validated['personName'] ?? null,
+        );
+        $involvedPersons = $this->normalizedPersonRows($validated['involvedPersons'] ?? []);
+        if ($primaryPerson['personName'] === '' && $involvedPersons !== []) {
+            $primaryPerson = $involvedPersons[0];
+        }
         $coordinates = $this->resolvedCoordinates(
             $validated['latitude'] ?? null,
             $validated['longitude'] ?? null,
@@ -117,7 +138,9 @@ class MobileVehicularAccidentController extends Controller
         $vehicularAccident->update([
             'accident_type' => $validated['accidentType'],
             'vehicle_type' => $validated['vehicleType'] ?? null,
-            'involved_person_name' => $validated['personName'] ?? null,
+            'involved_person_name' => $primaryPerson['personName'] ?: null,
+            'involved_person_first_name' => $primaryPerson['firstName'] ?: null,
+            'involved_person_last_name' => $primaryPerson['lastName'] ?: null,
             'description' => $validated['description'],
             'vehicles_involved' => $validated['vehiclesInvolved'] ?? 1,
             'injured_count' => $validated['injuredCount'] ?? 0,
@@ -128,10 +151,12 @@ class MobileVehicularAccidentController extends Controller
 
         // Replace involved persons
         $vehicularAccident->involvedPersons()->delete();
-        foreach (($validated['involvedPersons'] ?? []) as $person) {
+        foreach ($involvedPersons as $person) {
             AccidentInvolvedPerson::create([
                 'accident_id' => $vehicularAccident->accident_id,
                 'person_name' => $person['personName'],
+                'first_name' => $person['firstName'],
+                'last_name' => $person['lastName'],
                 'role' => $person['role'] ?? null,
                 'contact_number' => $person['contactNumber'] ?? null,
             ]);
@@ -192,13 +217,17 @@ class MobileVehicularAccidentController extends Controller
             'roadSegment' => ['nullable', 'string', 'max:150'],
             'accidentType' => ['required', 'string', 'max:100'],
             'vehicleType' => ['nullable', 'string', 'max:100'],
+            'personFirstName' => ['nullable', 'string', 'max:75'],
+            'personLastName' => ['nullable', 'string', 'max:75'],
             'personName' => ['nullable', 'string', 'max:150'],
             'description' => ['required', 'string'],
             'vehiclesInvolved' => ['nullable', 'integer', 'min:1'],
             'injuredCount' => ['nullable', 'integer', 'min:0'],
             'fatalityCount' => ['nullable', 'integer', 'min:0'],
             'involvedPersons' => ['nullable', 'array'],
-            'involvedPersons.*.personName' => ['required', 'string', 'max:150'],
+            'involvedPersons.*.firstName' => ['nullable', 'string', 'max:75'],
+            'involvedPersons.*.lastName' => ['nullable', 'string', 'max:75'],
+            'involvedPersons.*.personName' => ['nullable', 'string', 'max:150'],
             'involvedPersons.*.role' => ['nullable', 'string', 'max:50'],
             'involvedPersons.*.contactNumber' => ['nullable', 'string', 'max:30'],
             'photos' => ['nullable', 'array'],
@@ -243,6 +272,63 @@ class MobileVehicularAccidentController extends Controller
         ]);
     }
 
+    protected function normalizedPersonName(mixed $firstName, mixed $lastName, mixed $fallbackName = null): array
+    {
+        $firstName = trim((string) $firstName);
+        $lastName = trim((string) $lastName);
+        $fallbackName = trim((string) $fallbackName);
+
+        if (($firstName === '' || $lastName === '') && $fallbackName !== '') {
+            [$firstName, $lastName] = $this->splitName($fallbackName);
+        }
+
+        return [
+            'firstName' => $firstName,
+            'lastName' => $lastName,
+            'personName' => trim($firstName.' '.$lastName),
+        ];
+    }
+
+    protected function normalizedPersonRows(array $people): array
+    {
+        $rows = collect($people)
+            ->map(function (array $person): array {
+                return [
+                    ...$person,
+                    ...$this->normalizedPersonName(
+                        $person['firstName'] ?? null,
+                        $person['lastName'] ?? null,
+                        $person['personName'] ?? null,
+                    ),
+                ];
+            })
+            ->filter(fn (array $person): bool => $person['firstName'] !== '' || $person['lastName'] !== '')
+            ->values();
+
+        $invalidIndex = $rows->search(fn (array $person): bool => $person['firstName'] === '' || $person['lastName'] === '');
+
+        if ($invalidIndex !== false) {
+            throw ValidationException::withMessages([
+                "involvedPersons.{$invalidIndex}.firstName" => 'Enter both first name and last name for each involved person.',
+            ]);
+        }
+
+        return $rows->all();
+    }
+
+    protected function splitName(string $name): array
+    {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+
+        if (count($parts) <= 1) {
+            return [$parts[0] ?? '', ''];
+        }
+
+        $lastName = array_pop($parts);
+
+        return [implode(' ', $parts), $lastName];
+    }
+
     protected function resolvedCoordinates(mixed $latitude, mixed $longitude): array
     {
         if ($this->hasCoordinates($latitude, $longitude)) {
@@ -271,6 +357,9 @@ class MobileVehicularAccidentController extends Controller
     {
         $latestValidation = $accident->validations->first();
         $showValidationFeedback = $accident->status !== 'recorded';
+        [$personFirstName, $personLastName] = filled($accident->involved_person_first_name) || filled($accident->involved_person_last_name)
+            ? [(string) $accident->involved_person_first_name, (string) $accident->involved_person_last_name]
+            : $this->splitName($accident->involved_person_name ?? '');
 
         return [
             'id' => $accident->accident_id,
@@ -279,16 +368,26 @@ class MobileVehicularAccidentController extends Controller
             'roadSegment' => $accident->location?->road_segment ?? '',
             'accidentType' => $accident->accident_type,
             'vehicleType' => $accident->vehicle_type ?? '',
+            'personFirstName' => $personFirstName,
+            'personLastName' => $personLastName,
             'personName' => $accident->involved_person_name ?? '',
             'description' => $accident->description ?? '',
             'vehiclesInvolved' => $accident->vehicles_involved,
             'injuredCount' => $accident->injured_count,
             'fatalityCount' => $accident->fatality_count,
-            'involvedPersons' => $accident->involvedPersons->map(fn ($p) => [
-                'personName' => $p->person_name,
-                'role' => $p->role ?? '',
-                'contactNumber' => $p->contact_number ?? '',
-            ])->all(),
+            'involvedPersons' => $accident->involvedPersons->map(function ($p): array {
+                [$firstName, $lastName] = filled($p->first_name) || filled($p->last_name)
+                    ? [(string) $p->first_name, (string) $p->last_name]
+                    : $this->splitName($p->person_name);
+
+                return [
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                    'personName' => $p->person_name,
+                    'role' => $p->role ?? '',
+                    'contactNumber' => $p->contact_number ?? '',
+                ];
+            })->all(),
             'photos' => $accident->images->pluck('image_path')->all(),
             'longitude' => $this->hasCoordinates($accident->location?->longitude, $accident->location?->latitude)
                 ? (string) $accident->location?->longitude

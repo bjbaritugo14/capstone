@@ -644,7 +644,7 @@ class VehicularAccidentController extends Controller
 In this Expo project, create `.env` from `.env.example`:
 
 ```env
-EXPO_PUBLIC_USE_MOCK_API=false
+EXPO_PUBLIC_USE_REAL_API=true
 EXPO_PUBLIC_API_BASE_URL=http://YOUR_COMPUTER_LAN_IP:8000/api
 ```
 

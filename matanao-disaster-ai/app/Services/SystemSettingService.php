@@ -17,21 +17,6 @@ class SystemSettingService
             'default' => 4,
             'label' => 'Default household size',
         ],
-        'recommendation_food_multiplier_minor' => [
-            'type' => 'float',
-            'default' => 1.0,
-            'label' => 'Minor food multiplier',
-        ],
-        'recommendation_food_multiplier_moderate' => [
-            'type' => 'float',
-            'default' => 1.5,
-            'label' => 'Moderate food multiplier',
-        ],
-        'recommendation_food_multiplier_severe' => [
-            'type' => 'float',
-            'default' => 2.0,
-            'label' => 'Severe food multiplier',
-        ],
         'recommendation_medicine_divisor_minor' => [
             'type' => 'integer',
             'default' => 20,

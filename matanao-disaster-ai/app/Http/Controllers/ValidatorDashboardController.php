@@ -16,6 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ValidatorDashboardController extends Controller
@@ -61,7 +62,9 @@ class ValidatorDashboardController extends Controller
             'disasterType' => ['required', 'string', 'max:100'],
             'severity' => ['required', 'in:minor,moderate,severe'],
             'families' => ['required', 'array', 'min:1'],
-            'families.*.familyHeadName' => ['required', 'string', 'max:150'],
+            'families.*.firstName' => ['nullable', 'string', 'max:75'],
+            'families.*.lastName' => ['nullable', 'string', 'max:75'],
+            'families.*.familyHeadName' => ['nullable', 'string', 'max:150'],
             'families.*.householdMembers' => ['required', 'integer', 'min:1'],
             'families.*.contactNumber' => ['nullable', 'string', 'max:30'],
             'families.*.evacuationStatus' => ['nullable', 'string', 'max:50'],
@@ -78,9 +81,7 @@ class ValidatorDashboardController extends Controller
             'form_context' => ['nullable', 'string'],
         ]);
 
-        $families = collect($validated['families'])
-            ->filter(fn (array $family) => filled($family['familyHeadName'] ?? null))
-            ->values();
+        $families = $this->normalizedFamilyRows($validated['families']);
 
         DB::transaction(function () use ($request, $validated, $families): void {
             $barangay = Barangay::query()->findOrFail($validated['barangay_id']);
@@ -114,6 +115,8 @@ class ValidatorDashboardController extends Controller
                 $familyRecord = AffectedFamily::create([
                     'report_id' => $report->report_id,
                     'family_head_name' => $family['familyHeadName'],
+                    'first_name' => $family['firstName'],
+                    'last_name' => $family['lastName'],
                     'household_members' => $family['householdMembers'],
                     'contact_number' => $family['contactNumber'] ?? null,
                     'evacuation_status' => $family['evacuationStatus'] ?? null,
@@ -164,13 +167,17 @@ class ValidatorDashboardController extends Controller
             'roadSegment' => ['nullable', 'string', 'max:150'],
             'accidentType' => ['required', 'string', 'max:100'],
             'vehicleType' => ['nullable', 'string', 'max:100'],
+            'personFirstName' => ['nullable', 'string', 'max:75'],
+            'personLastName' => ['nullable', 'string', 'max:75'],
             'personName' => ['nullable', 'string', 'max:150'],
             'description' => ['required', 'string'],
             'vehiclesInvolved' => ['nullable', 'integer', 'min:1'],
             'injuredCount' => ['nullable', 'integer', 'min:0'],
             'fatalityCount' => ['nullable', 'integer', 'min:0'],
             'involvedPersons' => ['nullable', 'array'],
-            'involvedPersons.*.personName' => ['required', 'string', 'max:150'],
+            'involvedPersons.*.firstName' => ['nullable', 'string', 'max:75'],
+            'involvedPersons.*.lastName' => ['nullable', 'string', 'max:75'],
+            'involvedPersons.*.personName' => ['nullable', 'string', 'max:150'],
             'involvedPersons.*.role' => ['nullable', 'string', 'max:50'],
             'involvedPersons.*.contactNumber' => ['nullable', 'string', 'max:30'],
             'photos' => ['nullable', 'array'],
@@ -181,11 +188,17 @@ class ValidatorDashboardController extends Controller
             'form_context' => ['nullable', 'string'],
         ]);
 
-        $people = collect($validated['involvedPersons'] ?? [])
-            ->filter(fn (array $person) => filled($person['personName'] ?? null))
-            ->values();
+        $primaryPerson = $this->normalizedPersonName(
+            $validated['personFirstName'] ?? null,
+            $validated['personLastName'] ?? null,
+            $validated['personName'] ?? null,
+        );
+        $people = $this->normalizedPersonRows($validated['involvedPersons'] ?? []);
+        if ($primaryPerson['personName'] === '' && $people->isNotEmpty()) {
+            $primaryPerson = $people->first();
+        }
 
-        DB::transaction(function () use ($request, $validated, $people): void {
+        DB::transaction(function () use ($request, $validated, $primaryPerson, $people): void {
             $barangay = Barangay::query()->findOrFail($validated['barangay_id']);
             $coordinates = $this->resolvedLocationCoordinates(
                 $validated['latitude'] ?? null,
@@ -205,7 +218,9 @@ class ValidatorDashboardController extends Controller
                 'location_id' => $location->location_id,
                 'accident_type' => $validated['accidentType'],
                 'vehicle_type' => $validated['vehicleType'] ?? null,
-                'involved_person_name' => $validated['personName'] ?? null,
+                'involved_person_name' => $primaryPerson['personName'] ?: null,
+                'involved_person_first_name' => $primaryPerson['firstName'] ?: null,
+                'involved_person_last_name' => $primaryPerson['lastName'] ?: null,
                 'description' => $validated['description'],
                 'vehicles_involved' => $validated['vehiclesInvolved'] ?? 1,
                 'injured_count' => $validated['injuredCount'] ?? 0,
@@ -219,6 +234,8 @@ class ValidatorDashboardController extends Controller
                 AccidentInvolvedPerson::create([
                     'accident_id' => $accident->accident_id,
                     'person_name' => $person['personName'],
+                    'first_name' => $person['firstName'],
+                    'last_name' => $person['lastName'],
                     'role' => $person['role'] ?? null,
                     'contact_number' => $person['contactNumber'] ?? null,
                 ]);
@@ -239,6 +256,102 @@ class ValidatorDashboardController extends Controller
         return redirect()
             ->route('field-officer.dashboard')
             ->with('status', 'Vehicular accident report submitted from the web reporting dashboard.');
+    }
+
+    protected function normalizedFamilyRows(array $families): Collection
+    {
+        $rows = collect($families)
+            ->map(function (array $family): array {
+                $firstName = trim((string) ($family['firstName'] ?? ''));
+                $lastName = trim((string) ($family['lastName'] ?? ''));
+                $fallbackName = trim((string) ($family['familyHeadName'] ?? ''));
+
+                if (($firstName === '' || $lastName === '') && $fallbackName !== '') {
+                    [$firstName, $lastName] = $this->splitName($fallbackName);
+                }
+
+                return [
+                    ...$family,
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                    'familyHeadName' => trim($firstName.' '.$lastName),
+                ];
+            })
+            ->filter(fn (array $family): bool => $family['firstName'] !== '' || $family['lastName'] !== '')
+            ->values();
+
+        if ($rows->isEmpty()) {
+            throw ValidationException::withMessages([
+                'families' => 'Add at least one affected family with first name and last name.',
+            ]);
+        }
+
+        $invalidIndex = $rows->search(fn (array $family): bool => $family['firstName'] === '' || $family['lastName'] === '');
+
+        if ($invalidIndex !== false) {
+            throw ValidationException::withMessages([
+                "families.{$invalidIndex}.firstName" => 'Enter both first name and last name for each affected family.',
+            ]);
+        }
+
+        return $rows;
+    }
+
+    protected function splitName(string $name): array
+    {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+
+        if (count($parts) <= 1) {
+            return [$parts[0] ?? '', ''];
+        }
+
+        $lastName = array_pop($parts);
+
+        return [implode(' ', $parts), $lastName];
+    }
+
+    protected function normalizedPersonName(mixed $firstName, mixed $lastName, mixed $fallbackName = null): array
+    {
+        $firstName = trim((string) $firstName);
+        $lastName = trim((string) $lastName);
+        $fallbackName = trim((string) $fallbackName);
+
+        if (($firstName === '' || $lastName === '') && $fallbackName !== '') {
+            [$firstName, $lastName] = $this->splitName($fallbackName);
+        }
+
+        return [
+            'firstName' => $firstName,
+            'lastName' => $lastName,
+            'personName' => trim($firstName.' '.$lastName),
+        ];
+    }
+
+    protected function normalizedPersonRows(array $people): Collection
+    {
+        $rows = collect($people)
+            ->map(function (array $person): array {
+                return [
+                    ...$person,
+                    ...$this->normalizedPersonName(
+                        $person['firstName'] ?? null,
+                        $person['lastName'] ?? null,
+                        $person['personName'] ?? null,
+                    ),
+                ];
+            })
+            ->filter(fn (array $person): bool => $person['firstName'] !== '' || $person['lastName'] !== '')
+            ->values();
+
+        $invalidIndex = $rows->search(fn (array $person): bool => $person['firstName'] === '' || $person['lastName'] === '');
+
+        if ($invalidIndex !== false) {
+            throw ValidationException::withMessages([
+                "involvedPersons.{$invalidIndex}.firstName" => 'Enter both first name and last name for each involved person.',
+            ]);
+        }
+
+        return $rows;
     }
 
     protected function recentSubmissions(Collection $reports, Collection $accidents): array

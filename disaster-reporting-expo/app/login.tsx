@@ -34,8 +34,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Disaster Reporting</Text>
-        <Text style={styles.subtitle}>Field Officer mobile reporting connected to the Matanao Laravel system</Text>
+        <Text style={styles.title}>Matanao Field Reporting</Text>
 
         <TextInput
           style={styles.input}
@@ -58,7 +57,6 @@ export default function LoginScreen() {
           {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Login</Text>}
         </TouchableOpacity>
 
-        <Text style={styles.helper}>Use an active Field Officer account, for example field@example.com / password.</Text>
       </View>
     </SafeAreaView>
   );
@@ -84,10 +82,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     color: '#111827',
-    marginBottom: 6,
-  },
-  subtitle: {
-    color: '#4b5563',
     marginBottom: 20,
   },
   input: {
@@ -109,10 +103,5 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: '700',
-  },
-  helper: {
-    marginTop: 14,
-    color: '#6b7280',
-    fontSize: 12,
   },
 });

@@ -12,8 +12,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <h1>MDRRMO Assessment Dashboard</h1>
-        <p class="muted">GIS-based monitoring, validated field reports, and Decision Tree recommendation outputs.</p>
+        <h1>Matanao Incident Assessment Dashboard</h1>
     </div>
     <div class="header-actions">
         <a href="{{ route('reports.index') }}" class="btn btn-primary">Open Field Records</a>
@@ -43,21 +42,24 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>GIS Monitoring Map</h2>
-                <p class="muted">Geotagged disaster and vehicular accident records inside Matanao.</p>
+                <h2>Matanao GIS Incident Map</h2>
             </div>
             <span class="badge badge-blue">Leaflet</span>
         </div>
         <div class="map-shell">
             <div id="matanao-map" class="map-canvas" aria-label="Map of Matanao"></div>
         </div>
+        <div class="map-severity-legend" aria-label="Severity legend">
+            <span><i class="map-severity-dot low"></i><span class="badge badge-green">Low</span></span>
+            <span><i class="map-severity-dot medium"></i><span class="badge badge-amber">Medium</span></span>
+            <span><i class="map-severity-dot high"></i><span class="badge badge-red">High</span></span>
+        </div>
     </section>
 
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Decision Tree Recommendations</h2>
-                <p class="muted">Assistance outputs for validated disaster-related reports.</p>
+                <h2>Relief Recommendations by Barangay</h2>
             </div>
             <span class="badge badge-green">Decision Tree</span>
         </div>
@@ -85,8 +87,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Affected Barangays</h2>
-                <p class="muted">Impact profile and corresponding response emphasis.</p>
+                <h2>Affected Barangay Priorities</h2>
             </div>
         </div>
         <div class="list-table">
@@ -105,8 +106,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Recent Incident Entries</h2>
-                <p class="muted">Latest geotagged submissions for dashboard monitoring.</p>
+                <h2>Latest Submitted Incidents</h2>
             </div>
         </div>
         <div class="table-wrap">
@@ -140,8 +140,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Vehicular Accident Monitoring</h2>
-                <p class="muted">Separate module for geotagged accident recording and hotspot review.</p>
+                <h2>Vehicular Accident Hotspots</h2>
             </div>
         </div>
         <div class="list-table">
@@ -160,8 +159,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Process Overview</h2>
-                <p class="muted">How reports move from submission to validation and recommendation output.</p>
+                <h2>Submission-to-Validation Flow</h2>
             </div>
         </div>
         <div class="timeline-list">
@@ -197,12 +195,60 @@
     }).addTo(map);
 
     const bounds = [];
+    const severityStyles = {
+        Low: { stroke: '#166534', fill: '#22c55e', badge: 'badge-green' },
+        Medium: { stroke: '#b45309', fill: '#f59e0b', badge: 'badge-amber' },
+        High: { stroke: '#b91c1c', fill: '#ef4444', badge: 'badge-red' },
+    };
+
+    function severityStyle(severity) {
+        return severityStyles[severity] || severityStyles.Low;
+    }
 
     mapPoints.forEach((point) => {
-        const marker = L.marker([point.lat, point.lng]).addTo(map);
+        const style = severityStyle(point.severity);
+        const isFamilyPin = point.kind === 'family_pin';
+        const marker = L.circleMarker([point.lat, point.lng], isFamilyPin
+            ? {
+                radius: 10,
+                color: style.stroke,
+                fillColor: style.fill,
+                fillOpacity: 0.95,
+                weight: 3,
+            }
+            : {
+                radius: point.severity === 'High' ? 10 : 8,
+                color: style.stroke,
+                fillColor: style.fill,
+                fillOpacity: 0.86,
+                weight: 2,
+            }
+        ).addTo(map);
+
         marker.bindPopup(
-            `<strong>${point.barangay}</strong><br>${point.code}<br>${point.incident_type}<br>${point.severity} | ${point.status}`
+            isFamilyPin
+            ? `<strong class="map-popup-title">${point.name}</strong>
+            <div class="map-popup-line">${point.code} | ${point.barangay}</div>
+            <div class="map-popup-line">${point.household_members} members | ${point.evacuation_status}</div>
+            <div class="map-popup-badges">
+                <span class="badge ${style.badge}">${point.severity}</span>
+                <span class="badge badge-blue">Family Pin</span>
+                <span class="badge badge-green">${point.status}</span>
+            </div>`
+            : `<strong class="map-popup-title">${point.barangay}</strong>
+            <div class="map-popup-line">${point.code}</div>
+            <div class="map-popup-line">${point.incident_type}</div>
+            <div class="map-popup-badges">
+                <span class="badge ${style.badge}">${point.severity}</span>
+                <span class="badge badge-blue">${point.status}</span>
+            </div>`
         );
+
+        if (isFamilyPin) {
+            marker.on('mouseover', () => marker.openPopup());
+            marker.bringToFront();
+        }
+
         bounds.push([point.lat, point.lng]);
     });
 

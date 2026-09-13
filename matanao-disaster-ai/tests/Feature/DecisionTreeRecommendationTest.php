@@ -115,7 +115,7 @@ class DecisionTreeRecommendationTest extends TestCase
         foreach ([
             ['Family Minor', 3, 'minor'],
             ['Family Moderate A', 6, 'moderate'],
-            ['Family Moderate B', 8, 'moderate'],
+            ['Family Moderate B', 9, 'moderate'],
             ['Family Severe', 11, 'severe'],
         ] as [$name, $members, $severity]) {
             AffectedFamily::create([
@@ -132,9 +132,9 @@ class DecisionTreeRecommendationTest extends TestCase
         $this->assertSame(['minor' => 1, 'moderate' => 2, 'severe' => 1], $result['inputs']['severity_counts']);
         $this->assertSame('severe', $result['inputs']['damage_severity']);
         $this->assertSame(4, $result['inputs']['affected_families']);
-        $this->assertSame(28, $result['inputs']['household_members']);
+        $this->assertSame(29, $result['inputs']['household_members']);
         $this->assertSame('high', $result['inputs']['priority']);
-        $this->assertSame(6, $result['food_packs']);
+        $this->assertSame(9, $result['food_packs']);
         $this->assertSame(0, $result['medicine_kits']);
         $this->assertSame(4500.0, $result['cash_assistance']);
         $this->assertFalse($result['inputs']['medical_needs']);
@@ -243,5 +243,64 @@ class DecisionTreeRecommendationTest extends TestCase
         $this->assertTrue($result['inputs']['medical_needs']);
         $this->assertSame(2, $result['medicine_kits']);
         $this->assertStringContainsString('medical needs', $result['basis']);
+    }
+
+    public function test_medicine_kits_are_counted_only_from_families_with_medical_descriptions(): void
+    {
+        $role = Role::create(['role_name' => 'field_officer']);
+        $user = User::create([
+            'role_id' => $role->role_id,
+            'full_name' => 'Field Officer',
+            'email' => 'mixed-medical@example.com',
+            'password' => Hash::make('password'),
+            'status' => 'active',
+        ]);
+        $barangay = Barangay::create([
+            'barangay_name' => 'Sampaguita',
+            'municipality' => 'Matanao',
+            'province' => 'Davao del Sur',
+            'status' => 'active',
+        ]);
+        $location = IncidentLocation::create([
+            'barangay_id' => $barangay->barangay_id,
+            'latitude' => '6.688099',
+            'longitude' => '125.166607',
+            'sitio_purok' => 'Purok 1',
+        ]);
+        $report = DamageReport::create([
+            'user_id' => $user->user_id,
+            'location_id' => $location->location_id,
+            'disaster_type' => 'Flood',
+            'description' => 'Injured one person',
+            'damage_severity' => 'minor',
+            'affected_families' => 3,
+            'affected_structures' => 3,
+            'incident_datetime' => now(),
+            'status' => 'validated',
+            'created_at' => now(),
+        ]);
+
+        foreach ([
+            ['Bryan barz', 2, 'minor', 'Injured one person'],
+            ['Ryan beng', 4, 'severe', 'House got sweep by the flood'],
+            ['Bryan youan', 5, 'moderate', 'House got a water'],
+        ] as [$name, $members, $severity, $description]) {
+            AffectedFamily::create([
+                'report_id' => $report->report_id,
+                'family_head_name' => $name,
+                'household_members' => $members,
+                'description' => $description,
+                'damage_severity' => $severity,
+                'created_at' => now(),
+            ]);
+        }
+
+        $result = app(DecisionTreeRecommendationService::class)->generate($report);
+
+        $this->assertTrue($result['inputs']['medical_needs']);
+        $this->assertSame(['minor' => 1, 'moderate' => 1, 'severe' => 1], $result['inputs']['severity_counts']);
+        $this->assertSame(6, $result['food_packs']);
+        $this->assertSame(2, $result['medicine_kits']);
+        $this->assertSame(5250.0, $result['cash_assistance']);
     }
 }

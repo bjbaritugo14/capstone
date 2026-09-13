@@ -4,8 +4,7 @@
 <div class="page-header">
     <div>
         <div class="pill">Decision Tree Recommendation Module</div>
-        <h1>Assistance Recommendations</h1>
-        <p class="muted">Decision Tree-based recommendation outputs for cash assistance, food packs, and medicine, with optional Ollama-assisted refinement.</p>
+        <h1>Barangay Relief Recommendations</h1>
     </div>
 </div>
 
@@ -13,8 +12,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Recommendation Output</h2>
-                <p class="muted">Barangay-based assistance summary generated from database reports.</p>
+                <h2>Generated Assistance Outputs</h2>
             </div>
         </div>
 
@@ -57,8 +55,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Generate Recommendation</h2>
-                <p class="muted">Create Decision Tree recommendations for validated disaster reports. Ollama may assist with contextual refinement when available.</p>
+                <h2>Reports Ready for Recommendation</h2>
             </div>
         </div>
 

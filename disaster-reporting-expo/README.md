@@ -37,12 +37,12 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-### Use mock mode
+### Use offline mode
 
 Keep this value in `.env`:
 
 ```env
-EXPO_PUBLIC_USE_MOCK_API=true
+EXPO_PUBLIC_USE_REAL_API=false
 ```
 
 ### Use your Laravel API
@@ -50,7 +50,7 @@ EXPO_PUBLIC_USE_MOCK_API=true
 Change `.env` to:
 
 ```env
-EXPO_PUBLIC_USE_MOCK_API=false
+EXPO_PUBLIC_USE_REAL_API=true
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8000/api
 ```
 

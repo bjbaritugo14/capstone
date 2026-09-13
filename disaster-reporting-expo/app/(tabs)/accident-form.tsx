@@ -42,6 +42,8 @@ function buildEmptyForm(): VehicularAccidentPayload {
     barangay: 'Asbang',
     purok: '',
     roadSegment: '',
+    personFirstName: '',
+    personLastName: '',
     personName: '',
     accidentType: '',
     vehicleType: '',
@@ -58,7 +60,65 @@ function buildEmptyForm(): VehicularAccidentPayload {
 }
 
 function buildEmptyPerson(): InvolvedPerson {
-  return { personName: '', role: '', contactNumber: '' };
+  return { firstName: '', lastName: '', personName: '', role: '', contactNumber: '' };
+}
+
+function splitName(name?: string) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length <= 1) {
+    return {
+      firstName: parts[0] || '',
+      lastName: '',
+    };
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(' '),
+    lastName: parts[parts.length - 1],
+  };
+}
+
+function normalizePerson(person: InvolvedPerson): InvolvedPerson {
+  if (person.firstName || person.lastName) {
+    return {
+      ...person,
+      firstName: person.firstName || '',
+      lastName: person.lastName || '',
+      personName: `${person.firstName || ''} ${person.lastName || ''}`.trim(),
+    };
+  }
+
+  const split = splitName(person.personName);
+
+  return {
+    ...person,
+    ...split,
+    personName: `${split.firstName} ${split.lastName}`.trim(),
+  };
+}
+
+function normalizeAccidentNames(payload: VehicularAccidentPayload): VehicularAccidentPayload {
+  let involvedPersons = payload.involvedPersons.map(normalizePerson);
+
+  if (involvedPersons.length === 0 && payload.personName) {
+    involvedPersons = [
+      normalizePerson({
+        ...buildEmptyPerson(),
+        personName: payload.personName,
+      }),
+    ];
+  }
+
+  const primaryPerson = involvedPersons[0] || buildEmptyPerson();
+
+  return {
+    ...payload,
+    personFirstName: primaryPerson.firstName,
+    personLastName: primaryPerson.lastName,
+    personName: primaryPerson.personName,
+    involvedPersons,
+  };
 }
 
 export default function AccidentFormScreen() {
@@ -80,7 +140,7 @@ export default function AccidentFormScreen() {
   useEffect(() => {
     if (existingAccident) {
       const { id, status, validationRemarks, validatedAt, validatedBy, createdAt, ...payload } = existingAccident;
-      setForm(payload);
+      setForm(normalizeAccidentNames(payload));
     } else {
       setForm(buildEmptyForm());
     }
@@ -189,12 +249,20 @@ export default function AccidentFormScreen() {
       return;
     }
 
+    const submissionForm = normalizeAccidentNames(form);
+    const personMissingName = submissionForm.involvedPersons.some((person) => !person.firstName.trim() || !person.lastName.trim());
+
+    if (personMissingName) {
+      Alert.alert('Missing name', 'Enter first name and last name for each involved person.');
+      return;
+    }
+
     try {
       setSubmitting(true);
       if (existingAccident && accidentId) {
-        await updateAccident(accidentId, form);
+        await updateAccident(accidentId, submissionForm);
       } else {
-        await createAccident(form);
+        await createAccident(submissionForm);
       }
       Alert.alert('Success', existingAccident ? 'Accident report updated and sent back for review.' : 'Accident report submitted.');
       router.replace('/(tabs)/vehicular-accidents');
@@ -208,7 +276,7 @@ export default function AccidentFormScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.title}>{existingAccident ? 'Edit accident report' : 'New accident report'}</Text>
+        <Text style={styles.title}>{existingAccident ? 'Edit vehicular accident report' : 'New vehicular accident report'}</Text>
         {existingAccident?.status === 'returned' ? (
           <View style={styles.noticeBox}>
             <Text style={styles.noticeTitle}>Returned accident report</Text>
@@ -218,7 +286,7 @@ export default function AccidentFormScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Location</Text>
+        <Text style={styles.sectionTitle}>Barangay and road location</Text>
         <View style={styles.pickerWrapper}>
           <Picker selectedValue={form.barangay} onValueChange={(value) => setField('barangay', value)}>
             {barangayOptions.map((item) => (
@@ -229,7 +297,7 @@ export default function AccidentFormScreen() {
         <TextInput style={styles.input} placeholder="Purok / Sitio" value={form.purok} onChangeText={(value) => setField('purok', value)} />
         <TextInput style={styles.input} placeholder="Road segment (e.g. National Highway, Barangay Road)" value={form.roadSegment} onChangeText={(value) => setField('roadSegment', value)} />
 
-        <Text style={styles.sectionTitle}>Accident details</Text>
+        <Text style={styles.sectionTitle}>Vehicular accident details</Text>
         <TextInput
           style={styles.input}
           placeholder="Accident type (e.g. Collision, Hit and Run)"
@@ -278,13 +346,6 @@ export default function AccidentFormScreen() {
           onChangeText={(value) => setField('fatalityCount', Number(value || 0))}
         />
 
-        <Text style={styles.sectionTitle}>Involved Persons</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Primary person name (optional)"
-          value={form.personName}
-          onChangeText={(value) => setField('personName', value)}
-        />
         {form.involvedPersons.map((person, index) => (
           <View key={index} style={styles.personCard}>
             <View style={styles.personHeader}>
@@ -293,12 +354,20 @@ export default function AccidentFormScreen() {
                 <Ionicons name="close-circle" size={22} color="#ef4444" />
               </TouchableOpacity>
             </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Full name"
-              value={person.personName}
-              onChangeText={(value) => updatePerson(index, 'personName', value)}
-            />
+            <View style={styles.nameRow}>
+              <TextInput
+                style={[styles.input, styles.nameInput]}
+                placeholder="First name"
+                value={person.firstName}
+                onChangeText={(value) => updatePerson(index, 'firstName', value)}
+              />
+              <TextInput
+                style={[styles.input, styles.nameInput]}
+                placeholder="Last name"
+                value={person.lastName}
+                onChangeText={(value) => updatePerson(index, 'lastName', value)}
+              />
+            </View>
             <TextInput
               style={styles.input}
               placeholder="Role (e.g. Driver, Passenger, Pedestrian)"
@@ -319,7 +388,7 @@ export default function AccidentFormScreen() {
           <Text style={styles.secondaryButtonText}>Add involved person</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Photos</Text>
+        <Text style={styles.sectionTitle}>Accident photos</Text>
         <View style={styles.photoRow}>
           {(form.photos || []).length > 0 ? (
             (form.photos || []).map((photo, index) => (
@@ -331,7 +400,7 @@ export default function AccidentFormScreen() {
               </TouchableOpacity>
             ))
           ) : (
-            <Text style={styles.mutedText}>No photos selected yet.</Text>
+            <Text style={styles.mutedText}>No photos.</Text>
           )}
         </View>
         <TouchableOpacity style={styles.secondaryButton} onPress={pickImages}>
@@ -339,8 +408,7 @@ export default function AccidentFormScreen() {
           <Text style={styles.secondaryButtonText}>Choose photos</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>GPS</Text>
-        <Text style={styles.mutedText}>Capture a valid GPS point so the accident appears correctly on the GIS map.</Text>
+        <Text style={styles.sectionTitle}>Accident GPS coordinates</Text>
         <View style={styles.gpsRow}>
           <TextInput
             style={[styles.input, styles.halfInput]}
@@ -360,7 +428,7 @@ export default function AccidentFormScreen() {
           <Text style={styles.secondaryButtonText}>Use current location</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Incident date</Text>
+        <Text style={styles.sectionTitle}>Accident date</Text>
         <TextInput
           style={styles.input}
           placeholder="YYYY-MM-DD"
@@ -458,6 +526,13 @@ const styles = StyleSheet.create({
   gpsRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  nameInput: {
+    flex: 1,
   },
   halfInput: {
     flex: 1,

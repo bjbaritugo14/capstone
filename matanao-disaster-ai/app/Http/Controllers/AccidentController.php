@@ -120,12 +120,16 @@ class AccidentController extends Controller
             'sitio_purok' => $validated['sitio_purok'] ?? null,
         ]);
 
+        [$personFirstName, $personLastName] = $this->splitName($validated['involved_person_name'] ?? '');
+
         VehicularAccident::create([
             'user_id' => Auth::id(),
             'location_id' => $location->location_id,
             'accident_type' => $validated['accident_type'],
             'vehicle_type' => $validated['vehicle_type'] ?? null,
             'involved_person_name' => $validated['involved_person_name'] ?? null,
+            'involved_person_first_name' => $personFirstName ?: null,
+            'involved_person_last_name' => $personLastName ?: null,
             'description' => $validated['description'] ?? null,
             'vehicles_involved' => $validated['vehicles_involved'] ?? 1,
             'injured_count' => $validated['injured_count'] ?? 0,
@@ -166,5 +170,18 @@ class AccidentController extends Controller
         }
 
         return $latitude.', '.$longitude;
+    }
+
+    protected function splitName(string $name): array
+    {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+
+        if (count($parts) <= 1) {
+            return [$parts[0] ?? '', ''];
+        }
+
+        $lastName = array_pop($parts);
+
+        return [implode(' ', $parts), $lastName];
     }
 }

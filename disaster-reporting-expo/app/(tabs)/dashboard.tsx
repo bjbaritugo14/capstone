@@ -71,9 +71,8 @@ export default function DashboardScreen() {
         ListHeaderComponent={
           <>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Records you submitted</Text>
+              <Text style={styles.statLabel}>Disaster reports submitted</Text>
               <Text style={styles.statValue}>{reports.length}</Text>
-              <Text style={styles.statHelper}>Search, track review status, revise returned reports, and delete your submissions.</Text>
             </View>
 
             <View style={styles.toolbar}>
@@ -91,7 +90,7 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>My reports</Text>
+            <Text style={styles.sectionTitle}>Submitted disaster reports</Text>
           </>
         }
         renderItem={({ item }) => (
@@ -116,10 +115,10 @@ export default function DashboardScreen() {
             </View>
 
             <Text style={styles.cardMeta}>
-              {item.barangay ?? ''} • {item.purok ?? ''}
+              {item.barangay ?? ''} | {item.purok ?? ''}
             </Text>
             <Text style={styles.cardMeta}>
-              Families: {item.families?.length ?? 0} • Structures: {item.affectedStructures ?? 0}
+              Families: {item.families?.length ?? 0} | Structures: {item.affectedStructures ?? 0}
             </Text>
             <Text style={styles.description}>{item.description ?? ''}</Text>
             <Text style={styles.cardMeta}>Date reported: {item.reportDate ?? '-'}</Text>
@@ -193,10 +192,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 34,
     fontWeight: '800',
-    marginTop: 6,
-  },
-  statHelper: {
-    color: '#e0e7ff',
     marginTop: 6,
   },
   toolbar: {

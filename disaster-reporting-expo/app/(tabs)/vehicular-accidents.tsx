@@ -71,9 +71,8 @@ export default function VehicularAccidentsScreen() {
         ListHeaderComponent={
           <>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Vehicular accident records</Text>
+              <Text style={styles.statLabel}>Accident reports submitted</Text>
               <Text style={styles.statValue}>{accidents.length}</Text>
-              <Text style={styles.statHelper}>Submit, track validation status, revise returned reports, and delete accident records.</Text>
             </View>
 
             <View style={styles.toolbar}>
@@ -88,7 +87,7 @@ export default function VehicularAccidentsScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>Accident reports</Text>
+            <Text style={styles.sectionTitle}>Submitted accident reports</Text>
           </>
         }
         renderItem={({ item }) => (
@@ -184,10 +183,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 34,
     fontWeight: '800',
-    marginTop: 6,
-  },
-  statHelper: {
-    color: '#d1fae5',
     marginTop: 6,
   },
   toolbar: {

@@ -186,6 +186,7 @@ class DswdDashboardController extends Controller
                         'family_head_name' => $family->family_head_name,
                         'household_members' => (int) $family->household_members,
                         'evacuation_status' => $family->evacuation_status ?: 'Not specified',
+                        'severity' => $this->severityLabel($family->damage_severity ?: $report->damage_severity),
                         'lat' => (float) $family->latitude,
                         'lng' => (float) $family->longitude,
                     ])
@@ -221,7 +222,7 @@ class DswdDashboardController extends Controller
                         'subtitle' => $area['id'].' | '.$area['barangay'],
                         'note' => $familyPoint['household_members'].' household members | '.$familyPoint['evacuation_status'],
                         'coordinates' => $familyPoint['lat'].', '.$familyPoint['lng'],
-                        'severity' => $area['severity'],
+                        'severity' => $familyPoint['severity'],
                         'lat' => $familyPoint['lat'],
                         'lng' => $familyPoint['lng'],
                     ];

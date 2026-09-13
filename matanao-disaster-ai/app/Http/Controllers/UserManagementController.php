@@ -22,6 +22,7 @@ class UserManagementController extends Controller
             ->get();
 
         $roles = Role::query()
+            ->where('role_name', '!=', 'validator')
             ->orderBy('role_name')
             ->get();
 

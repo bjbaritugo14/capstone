@@ -1,5 +1,5 @@
 env: load .env
-env: export EXPO_PUBLIC_USE_MOCK_API EXPO_PUBLIC_API_BASE_URL
+env: export EXPO_PUBLIC_USE_REAL_API EXPO_PUBLIC_API_BASE_URL
 Starting project at C:\Users\Bryan\OneDrive\Desktop\disaster-reporting-expo
 Starting Metro Bundler
 The following packages should be updated for best compatibility with the installed expo version:

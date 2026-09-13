@@ -22,9 +22,9 @@
 
         $navigation = match ($role) {
             'super_admin', 'admin' => [
-                ['label' => 'User Roles', 'route' => 'admin.users', 'pattern' => 'admin.users', 'icon' => 'users', 'short' => 'UR'],
-                ['label' => 'Incident/Data Management', 'route' => 'admin.incident-management', 'pattern' => 'admin.incident-management*', 'icon' => 'database', 'short' => 'ID'],
-                ['label' => 'Recommendation History', 'route' => 'admin.recommendation-history', 'pattern' => 'admin.recommendation-history', 'icon' => 'history', 'short' => 'RH'],
+                ['label' => 'User Accounts', 'route' => 'admin.users', 'pattern' => 'admin.users', 'icon' => 'users', 'short' => 'UA'],
+                ['label' => 'Incident Records', 'route' => 'admin.incident-management', 'pattern' => 'admin.incident-management*', 'icon' => 'database', 'short' => 'IR'],
+                ['label' => 'Recommendation Logs', 'route' => 'admin.recommendation-history', 'pattern' => 'admin.recommendation-history', 'icon' => 'history', 'short' => 'RL'],
                 ['label' => 'Audit Trail', 'route' => 'admin.audit-trail', 'pattern' => 'admin.audit-trail', 'icon' => 'activity', 'short' => 'AT'],
                 ['label' => 'System Settings', 'route' => 'admin.settings', 'pattern' => 'admin.settings', 'icon' => 'settings', 'short' => 'SS'],
             ],
@@ -41,13 +41,13 @@
                 ['label' => 'Validation Queue', 'route' => 'validation.index', 'pattern' => 'validation.*', 'icon' => 'clipboard-check', 'short' => 'VQ'],
             ],
             'field_officer' => [
-                ['label' => 'Field Reporting Dashboard', 'route' => 'field-officer.dashboard', 'pattern' => 'field-officer.*', 'icon' => 'radio-tower', 'short' => 'FR'],
+                ['label' => 'Field Reports', 'route' => 'field-officer.dashboard', 'pattern' => 'field-officer.*', 'icon' => 'radio-tower', 'short' => 'FR'],
             ],
             'dswd' => [
-                ['label' => 'DSWD Dashboard', 'route' => 'dswd.dashboard', 'pattern' => 'dswd.dashboard', 'icon' => 'layout-dashboard', 'short' => 'DD'],
-                ['label' => 'Validated Areas GIS', 'route' => 'dswd.validated-areas', 'pattern' => 'dswd.validated-areas', 'icon' => 'map', 'short' => 'VA'],
+                ['label' => 'DSWD Overview', 'route' => 'dswd.dashboard', 'pattern' => 'dswd.dashboard', 'icon' => 'layout-dashboard', 'short' => 'DO'],
+                ['label' => 'Validated Area Map', 'route' => 'dswd.validated-areas', 'pattern' => 'dswd.validated-areas', 'icon' => 'map', 'short' => 'VA'],
                 ['label' => 'Affected Families', 'route' => 'affected-families.index', 'pattern' => 'affected-families.*', 'icon' => 'home', 'short' => 'AF'],
-                ['label' => 'Assistance Recommendations', 'route' => 'dswd.recommendations', 'pattern' => 'dswd.recommendations', 'icon' => 'hand-heart', 'short' => 'AR'],
+                ['label' => 'Relief Recommendations', 'route' => 'dswd.recommendations', 'pattern' => 'dswd.recommendations', 'icon' => 'hand-heart', 'short' => 'RR'],
             ],
             default => [],
         };
@@ -62,7 +62,7 @@
                         <div class="brand-mark">M</div>
                         <div>
                             <div class="brand">Matanao MDRRMO</div>
-                            <p class="brand-subtitle">Simulated disaster damage assessment system</p>
+                            <p class="brand-subtitle">Damage and incident monitoring</p>
                         </div>
                     </div>
 

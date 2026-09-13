@@ -53,6 +53,18 @@ class ReportController extends Controller
                     'coordinates' => $this->coordinates($report->location?->latitude, $report->location?->longitude),
                     'latitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->latitude : null,
                     'longitude' => $this->hasCoordinates($report->location?->latitude, $report->location?->longitude) ? (float) $report->location->longitude : null,
+                    'family_points' => $report->affectedFamilyRecords
+                        ->filter(fn (AffectedFamily $family): bool => $this->hasCoordinates($family->latitude, $family->longitude))
+                        ->map(fn (AffectedFamily $family): array => [
+                            'name' => $family->family_head_name,
+                            'household_members' => (int) $family->household_members,
+                            'evacuation_status' => $family->evacuation_status ?: 'Not specified',
+                            'severity' => $this->severityLabel($this->normalizedSeverity($family->damage_severity, $report->damage_severity)),
+                            'lat' => (float) $family->latitude,
+                            'lng' => (float) $family->longitude,
+                        ])
+                        ->values()
+                        ->all(),
                     'date' => optional($report->incident_datetime)->format('Y-m-d') ?? '',
                     'time' => optional($report->incident_datetime)->format('h:i A') ?? '',
                     'needs' => $this->needs($report),
@@ -129,18 +141,39 @@ class ReportController extends Controller
 
         $mapPoints = collect($reports)
             ->filter(fn (array $report) => $report['latitude'] !== null && $report['longitude'] !== null)
-            ->map(fn (array $report) => [
-                'id' => $report['id'],
-                'barangay' => $report['barangay'],
-                'type' => $report['type'],
-                'severity' => $report['severity'],
-                'status' => $report['status'],
-                'road_segment' => $report['road_segment'],
-                'families' => $report['families'],
-                'structures' => $report['houses'],
-                'lat' => $report['latitude'],
-                'lng' => $report['longitude'],
-            ])
+            ->flatMap(function (array $report): array {
+                $points = [[
+                    'kind' => 'report',
+                    'id' => $report['id'],
+                    'barangay' => $report['barangay'],
+                    'type' => $report['type'],
+                    'severity' => $report['severity'],
+                    'status' => $report['status'],
+                    'road_segment' => $report['road_segment'],
+                    'families' => $report['families'],
+                    'structures' => $report['houses'],
+                    'lat' => $report['latitude'],
+                    'lng' => $report['longitude'],
+                ]];
+
+                foreach ($report['family_points'] as $familyPoint) {
+                    $points[] = [
+                        'kind' => 'family_pin',
+                        'id' => $report['id'],
+                        'barangay' => $report['barangay'],
+                        'type' => $report['type'],
+                        'name' => $familyPoint['name'],
+                        'severity' => $familyPoint['severity'],
+                        'status' => $report['status'],
+                        'household_members' => $familyPoint['household_members'],
+                        'evacuation_status' => $familyPoint['evacuation_status'],
+                        'lat' => $familyPoint['lat'],
+                        'lng' => $familyPoint['lng'],
+                    ];
+                }
+
+                return $points;
+            })
             ->values()
             ->all();
 
@@ -202,9 +235,13 @@ class ReportController extends Controller
         ]);
 
         $familyRows->each(function (array $family) use ($report): void {
+            [$firstName, $lastName] = $this->splitName($family['family_head_name']);
+
             AffectedFamily::create([
                 'report_id' => $report->report_id,
                 'family_head_name' => $family['family_head_name'],
+                'first_name' => $firstName,
+                'last_name' => $lastName,
                 'household_members' => $family['household_members'] ?? 1,
                 'contact_number' => $family['contact_number'] ?? null,
                 'evacuation_status' => $family['evacuation_status'] ?? null,
@@ -372,20 +409,26 @@ class ReportController extends Controller
             return [];
         }
 
-        $foodPacks = (int) ($recommendation?->food_packs ?? 0);
+        $hasRecommendation = $recommendation !== null;
         $medicineKits = $this->hasMedicalNeedDescription($report)
             ? (int) ($recommendation?->medicine_kits ?? 0)
             : 0;
         $cashAssistance = (float) ($recommendation?->cash_assistance ?? 0);
         $fallbackSeverity = $this->normalizedSeverity($report->damage_severity);
+        $hasFamilyDescriptions = $families
+            ->contains(fn (AffectedFamily $family): bool => trim((string) $family->description) !== '');
 
         $rows = $families
-            ->map(function (AffectedFamily $family) use ($fallbackSeverity): array {
+            ->map(function (AffectedFamily $family) use ($report, $fallbackSeverity, $hasFamilyDescriptions): array {
                 $severity = $this->normalizedSeverity($family->damage_severity, $fallbackSeverity);
+                $medicalDescription = $hasFamilyDescriptions
+                    ? (string) $family->description
+                    : (string) $report->description;
 
                 return [
                     'severity_key' => $severity,
                     'family' => $family,
+                    'medicine_eligible' => $this->containsAny(strtolower($medicalDescription), $this->medicalDescriptionTerms()),
                     'name' => $family->family_head_name,
                     'household_members' => $family->household_members,
                     'contact_number' => $family->contact_number ?: 'N/A',
@@ -396,13 +439,20 @@ class ReportController extends Controller
             ->values()
             ->all();
 
-        $foodAllocations = $this->allocateWeightedWholeNumber(
-            $foodPacks,
-            array_map(fn (array $row): float => $this->foodWeight($row['severity_key']), $rows),
+        $foodAllocations = array_map(
+            fn (array $row): int => $hasRecommendation
+                ? $this->familyFoodPacks($row['severity_key'], (int) $row['household_members'])
+                : 0,
+            $rows,
         );
         $medicineAllocations = $this->allocateWeightedWholeNumber(
             $medicineKits,
-            array_map(fn (array $row): float => $this->medicineWeight($row['family'], $row['severity_key']), $rows),
+            array_map(
+                fn (array $row): float => $row['medicine_eligible']
+                    ? $this->medicineWeight($row['family'], $row['severity_key'])
+                    : 0.0,
+                $rows,
+            ),
         );
         $cashAllocations = $this->allocateWeightedMoney(
             $cashAssistance,
@@ -425,11 +475,6 @@ class ReportController extends Controller
         return $rows;
     }
 
-    protected function foodWeight(string $severity): float
-    {
-        return max(0.01, $this->settings->float('recommendation_food_multiplier_'.$severity));
-    }
-
     protected function medicineWeight(AffectedFamily $family, string $severity): float
     {
         $members = max(1, (int) $family->household_members);
@@ -439,6 +484,32 @@ class ReportController extends Controller
             : 1.0;
 
         return max(0.01, ($members / $divisor) * $multiplier);
+    }
+
+    protected function familyFoodPacks(string $severity, int $members): int
+    {
+        if ($severity === 'severe' || $members > 8) {
+            return 3;
+        }
+
+        if ($members > 4) {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    protected function splitName(string $name): array
+    {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+
+        if (count($parts) <= 1) {
+            return [$parts[0] ?? '', ''];
+        }
+
+        $lastName = array_pop($parts);
+
+        return [implode(' ', $parts), $lastName];
     }
 
     protected function cashWeight(string $severity): float
@@ -456,15 +527,19 @@ class ReportController extends Controller
 
         $total = max(0, $total);
         $weights = array_map(
-            fn (mixed $weight): float => is_numeric($weight) && (float) $weight > 0 ? (float) $weight : 1.0,
+            fn (mixed $weight): float => is_numeric($weight) && (float) $weight > 0 ? (float) $weight : 0.0,
             array_values($weights),
         );
         $weightTotal = array_sum($weights);
         $allocations = array_fill(0, $count, 0);
         $fractions = array_fill(0, $count, 0.0);
 
+        if ($weightTotal <= 0) {
+            return $allocations;
+        }
+
         foreach ($weights as $index => $weight) {
-            $rawShare = $weightTotal > 0 ? ($total * $weight) / $weightTotal : $total / $count;
+            $rawShare = ($total * $weight) / $weightTotal;
             $allocations[$index] = (int) floor($rawShare);
             $fractions[$index] = $rawShare - $allocations[$index];
         }

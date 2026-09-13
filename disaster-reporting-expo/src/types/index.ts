@@ -19,6 +19,8 @@ export type Severity = 'minor' | 'moderate' | 'severe';
 export type ReportStatus = 'pending' | 'validated' | 'returned' | 'rejected';
 
 export type AffectedFamily = {
+  firstName: string;
+  lastName: string;
   familyHeadName: string;
   householdMembers: number;
   contactNumber: string;
@@ -93,6 +95,8 @@ export const MATANAO_BARANGAYS = [
 export type AccidentStatus = 'recorded' | 'validated' | 'returned' | 'verified' | 'closed';
 
 export type InvolvedPerson = {
+  firstName: string;
+  lastName: string;
   personName: string;
   role: string;
   contactNumber: string;
@@ -103,6 +107,8 @@ export type VehicularAccident = {
   barangay: string;
   purok: string;
   roadSegment: string;
+  personFirstName: string;
+  personLastName: string;
   personName: string;
   accidentType: string;
   vehicleType: string;

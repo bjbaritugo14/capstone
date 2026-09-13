@@ -20,14 +20,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: 'Disaster Reports',
           tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="report-form"
         options={{
-          title: 'Report',
+          title: 'New Disaster',
           tabBarIcon: ({ color, size }) => <Ionicons name="create-outline" color={color} size={size} />,
         }}
       />
@@ -42,7 +42,7 @@ export default function TabsLayout() {
         name="accident-form"
         options={{
           href: null,
-          title: 'Accident Form',
+          title: 'New Accident',
         }}
       />
       <Tabs.Screen

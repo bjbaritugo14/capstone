@@ -34,7 +34,8 @@ class MobileVehicularAccidentApiTest extends TestCase
             'roadSegment' => 'National Highway',
             'accidentType' => 'Collision',
             'vehicleType' => 'Motorcycle',
-            'personName' => 'Juan Dela Cruz',
+            'personFirstName' => 'Juan',
+            'personLastName' => 'Dela Cruz',
             'description' => 'Two motorcycles collided.',
             'vehiclesInvolved' => 2,
             'injuredCount' => 1,
@@ -88,7 +89,8 @@ class MobileVehicularAccidentApiTest extends TestCase
             'roadSegment' => 'National Highway',
             'accidentType' => 'Collision',
             'vehicleType' => 'Tricycle',
-            'personName' => 'Juan Dela Cruz',
+            'personFirstName' => 'Juan',
+            'personLastName' => 'Dela Cruz',
             'description' => 'Updated after validator remarks.',
             'vehiclesInvolved' => 2,
             'injuredCount' => 2,
@@ -98,7 +100,8 @@ class MobileVehicularAccidentApiTest extends TestCase
             'longitude' => '125.166707',
             'involvedPersons' => [
                 [
-                    'personName' => 'Juan Dela Cruz',
+                    'firstName' => 'Juan',
+                    'lastName' => 'Dela Cruz',
                     'role' => 'driver',
                     'contactNumber' => '09123456789',
                 ],
@@ -108,6 +111,12 @@ class MobileVehicularAccidentApiTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('status', 'recorded')
+            ->assertJsonPath('personFirstName', 'Juan')
+            ->assertJsonPath('personLastName', 'Dela Cruz')
+            ->assertJsonPath('personName', 'Juan Dela Cruz')
+            ->assertJsonPath('involvedPersons.0.firstName', 'Juan')
+            ->assertJsonPath('involvedPersons.0.lastName', 'Dela Cruz')
+            ->assertJsonPath('involvedPersons.0.personName', 'Juan Dela Cruz')
             ->assertJsonPath('validationRemarks', '');
 
         $this->assertDatabaseHas('vehicular_accidents', [
@@ -115,7 +124,15 @@ class MobileVehicularAccidentApiTest extends TestCase
             'status' => 'recorded',
             'description' => 'Updated after validator remarks.',
             'vehicle_type' => 'Tricycle',
+            'involved_person_first_name' => 'Juan',
+            'involved_person_last_name' => 'Dela Cruz',
             'injured_count' => 2,
+        ]);
+        $this->assertDatabaseHas('accident_involved_persons', [
+            'accident_id' => $accident->accident_id,
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+            'person_name' => 'Juan Dela Cruz',
         ]);
     }
 

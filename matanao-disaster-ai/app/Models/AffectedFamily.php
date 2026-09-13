@@ -18,6 +18,8 @@ class AffectedFamily extends Model
     protected $fillable = [
         'report_id',
         'family_head_name',
+        'first_name',
+        'last_name',
         'household_members',
         'contact_number',
         'evacuation_status',

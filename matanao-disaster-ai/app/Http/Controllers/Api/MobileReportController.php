@@ -52,7 +52,9 @@ class MobileReportController extends Controller
             'disasterType' => ['required', 'string', 'max:100'],
             'severity' => ['required', 'in:minor,moderate,severe'],
             'families' => ['nullable', 'array'],
-            'families.*.familyHeadName' => ['required', 'string', 'max:150'],
+            'families.*.firstName' => ['nullable', 'string', 'max:75'],
+            'families.*.lastName' => ['nullable', 'string', 'max:75'],
+            'families.*.familyHeadName' => ['nullable', 'string', 'max:150'],
             'families.*.householdMembers' => ['required', 'integer', 'min:0'],
             'families.*.contactNumber' => ['nullable', 'string', 'max:20'],
             'families.*.evacuationStatus' => ['nullable', 'string', 'max:50'],
@@ -70,7 +72,7 @@ class MobileReportController extends Controller
 
         try {
             $barangay = $this->barangayFromPayload($validated);
-            $families = $validated['families'] ?? [];
+            $families = $this->normalizedFamilyRows($validated['families'] ?? []);
             $location = $this->createLocation($validated, $barangay, $families);
 
             $report = DamageReport::create([
@@ -90,6 +92,8 @@ class MobileReportController extends Controller
                 $familyRecord = AffectedFamily::create([
                     'report_id' => $report->report_id,
                     'family_head_name' => $family['familyHeadName'],
+                    'first_name' => $family['firstName'],
+                    'last_name' => $family['lastName'],
                     'household_members' => $family['householdMembers'],
                     'contact_number' => $family['contactNumber'] ?? null,
                     'evacuation_status' => $family['evacuationStatus'] ?? null,
@@ -162,7 +166,9 @@ class MobileReportController extends Controller
             'disasterType' => ['required', 'string', 'max:100'],
             'severity' => ['required', 'in:minor,moderate,severe'],
             'families' => ['nullable', 'array'],
-            'families.*.familyHeadName' => ['required', 'string', 'max:150'],
+            'families.*.firstName' => ['nullable', 'string', 'max:75'],
+            'families.*.lastName' => ['nullable', 'string', 'max:75'],
+            'families.*.familyHeadName' => ['nullable', 'string', 'max:150'],
             'families.*.householdMembers' => ['required', 'integer', 'min:0'],
             'families.*.contactNumber' => ['nullable', 'string', 'max:20'],
             'families.*.evacuationStatus' => ['nullable', 'string', 'max:50'],
@@ -179,7 +185,7 @@ class MobileReportController extends Controller
         ]);
 
         $barangay = $this->barangayFromPayload($validated);
-        $families = $validated['families'] ?? [];
+        $families = $this->normalizedFamilyRows($validated['families'] ?? []);
         $coordinates = $this->resolvedCoordinates(
             $validated['latitude'] ?? null,
             $validated['longitude'] ?? null,
@@ -215,6 +221,8 @@ class MobileReportController extends Controller
             $familyRecord = AffectedFamily::create([
                 'report_id' => $report->report_id,
                 'family_head_name' => $family['familyHeadName'],
+                'first_name' => $family['firstName'],
+                'last_name' => $family['lastName'],
                 'household_members' => $family['householdMembers'],
                 'contact_number' => $family['contactNumber'] ?? null,
                 'evacuation_status' => $family['evacuationStatus'] ?? null,
@@ -313,6 +321,58 @@ class MobileReportController extends Controller
         ]);
     }
 
+    protected function normalizedFamilyRows(array $families): array
+    {
+        $rows = collect($families)
+            ->map(function (array $family): array {
+                $firstName = trim((string) ($family['firstName'] ?? ''));
+                $lastName = trim((string) ($family['lastName'] ?? ''));
+                $fallbackName = trim((string) ($family['familyHeadName'] ?? ''));
+
+                if (($firstName === '' || $lastName === '') && $fallbackName !== '') {
+                    [$firstName, $lastName] = $this->splitName($fallbackName);
+                }
+
+                return [
+                    ...$family,
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                    'familyHeadName' => trim($firstName.' '.$lastName),
+                ];
+            })
+            ->filter(fn (array $family): bool => $family['firstName'] !== '' || $family['lastName'] !== '')
+            ->values();
+
+        if ($rows->isEmpty()) {
+            throw ValidationException::withMessages([
+                'families' => 'Add at least one affected family with first name and last name.',
+            ]);
+        }
+
+        $invalidIndex = $rows->search(fn (array $family): bool => $family['firstName'] === '' || $family['lastName'] === '');
+
+        if ($invalidIndex !== false) {
+            throw ValidationException::withMessages([
+                "families.{$invalidIndex}.firstName" => 'Enter both first name and last name for each affected family.',
+            ]);
+        }
+
+        return $rows->all();
+    }
+
+    protected function splitName(string $name): array
+    {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+
+        if (count($parts) <= 1) {
+            return [$parts[0] ?? '', ''];
+        }
+
+        $lastName = array_pop($parts);
+
+        return [implode(' ', $parts), $lastName];
+    }
+
     protected function resolvedCoordinates(mixed $latitude, mixed $longitude, array $families): array
     {
         if ($this->hasCoordinates($latitude, $longitude)) {
@@ -358,17 +418,25 @@ class MobileReportController extends Controller
             'description' => $report->description ?? '',
             'disasterType' => $report->disaster_type,
             'severity' => $report->damage_severity,
-            'families' => $report->affectedFamilyRecords->map(fn (AffectedFamily $f) => [
-                'familyHeadName' => $f->family_head_name,
-                'householdMembers' => (int) $f->household_members,
-                'contactNumber' => $f->contact_number ?? '',
-                'evacuationStatus' => $f->evacuation_status ?? '',
-                'description' => $f->description ?? '',
-                'severity' => $f->damage_severity ?? $report->damage_severity,
-                'latitude' => $f->latitude ? (string) $f->latitude : '',
-                'longitude' => $f->longitude ? (string) $f->longitude : '',
-                'photos' => $f->images->pluck('image_path')->all(),
-            ])->all(),
+            'families' => $report->affectedFamilyRecords->map(function (AffectedFamily $f) use ($report): array {
+                [$firstName, $lastName] = filled($f->first_name) || filled($f->last_name)
+                    ? [(string) $f->first_name, (string) $f->last_name]
+                    : $this->splitName($f->family_head_name);
+
+                return [
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                    'familyHeadName' => $f->family_head_name,
+                    'householdMembers' => (int) $f->household_members,
+                    'contactNumber' => $f->contact_number ?? '',
+                    'evacuationStatus' => $f->evacuation_status ?? '',
+                    'description' => $f->description ?? '',
+                    'severity' => $f->damage_severity ?? $report->damage_severity,
+                    'latitude' => $f->latitude ? (string) $f->latitude : '',
+                    'longitude' => $f->longitude ? (string) $f->longitude : '',
+                    'photos' => $f->images->pluck('image_path')->all(),
+                ];
+            })->all(),
             'affectedStructures' => $report->affected_structures,
             'photos' => $report->images->whereNull('family_id')->pluck('image_path')->all(),
             'longitude' => $this->hasCoordinates($report->location?->longitude, $report->location?->latitude)

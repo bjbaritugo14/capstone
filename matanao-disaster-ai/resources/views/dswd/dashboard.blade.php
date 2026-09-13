@@ -13,12 +13,11 @@
 <div class="page-header">
     <div>
         <div class="pill">DSWD Disaster Dashboard</div>
-        <h1>Affected Families Overview</h1>
-        <p class="muted">Barangay impact, household member totals, and family-level records from validated disaster intake.</p>
+        <h1>Validated Affected Families Overview</h1>
     </div>
     <div class="header-actions">
-        <a href="{{ route('dswd.validated-areas') }}" class="btn btn-secondary">Validated Areas GIS</a>
-        <a href="{{ route('dswd.recommendations') }}" class="btn btn-primary">View Recommendations</a>
+        <a href="{{ route('dswd.validated-areas') }}" class="btn btn-secondary">Open Area Map</a>
+        <a href="{{ route('dswd.recommendations') }}" class="btn btn-primary">Relief Recommendations</a>
     </div>
 </div>
 
@@ -45,8 +44,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Barangay Impact</h2>
-                <p class="muted">Family and household member totals grouped by barangay.</p>
+                <h2>Barangay Family Impact</h2>
             </div>
         </div>
 
@@ -73,8 +71,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Recent Affected Families</h2>
-                <p class="muted">Family names and household sizes for relief validation.</p>
+                <h2>Latest Validated Families</h2>
             </div>
         </div>
 
@@ -111,8 +108,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Validated Affected Areas</h2>
-                <p class="muted">Validated area coverage with GIS-ready family pins for DSWD relief planning.</p>
+                <h2>Mapped Validated Areas</h2>
             </div>
             <span class="badge badge-blue">GIS Module</span>
         </div>
@@ -122,8 +118,6 @@
             <div><span>Covered Barangays</span><strong>{{ $validatedAreaStats['barangays'] }}</strong></div>
             <div><span>Family Pins</span><strong>{{ $validatedAreaStats['family_pins'] }}</strong></div>
         </div>
-
-        <p class="item-note">The dedicated validated-area module maps only validated affected areas and shows per-family coordinates when field teams captured them.</p>
 
         <div class="list-table top-gap">
             @forelse($validatedAreaPreview as $area)
@@ -145,21 +139,25 @@
         </div>
 
         <div class="top-gap">
-            <a href="{{ route('dswd.validated-areas') }}" class="btn btn-primary">Open Validated Areas Module</a>
+            <a href="{{ route('dswd.validated-areas') }}" class="btn btn-primary">Open Area Map</a>
         </div>
     </section>
 
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>GIS Preview</h2>
-                <p class="muted">Map preview of validated affected areas and family-level coordinate pins inside the DSWD dashboard.</p>
+                <h2>Validated Area Map Preview</h2>
             </div>
             <span class="badge badge-blue">Map View</span>
         </div>
 
         <div class="map-shell">
             <div id="dswd-validated-area-preview-map" class="map-canvas" aria-label="Validated affected areas preview map"></div>
+        </div>
+        <div class="map-severity-legend" aria-label="Map legend">
+            <span><i class="map-severity-dot low"></i><span class="badge badge-green">Low</span></span>
+            <span><i class="map-severity-dot medium"></i><span class="badge badge-amber">Medium</span></span>
+            <span><i class="map-severity-dot high"></i><span class="badge badge-red">High</span></span>
         </div>
 
         <div class="mini-grid top-gap">
@@ -192,34 +190,53 @@
     }).addTo(previewMap);
 
     const previewBounds = [];
+    const severityStyles = {
+        Low: { stroke: '#166534', fill: '#22c55e', badge: 'badge-green' },
+        Medium: { stroke: '#b45309', fill: '#f59e0b', badge: 'badge-amber' },
+        High: { stroke: '#b91c1c', fill: '#ef4444', badge: 'badge-red' },
+    };
+
+    function severityStyle(severity) {
+        return severityStyles[severity] || severityStyles.Low;
+    }
 
     previewMapPoints.forEach((point) => {
         let layer;
+        const style = severityStyle(point.severity);
 
         if (point.kind === 'family_pin') {
             layer = L.circleMarker([point.lat, point.lng], {
-                radius: 6,
-                color: '#1d4ed8',
-                fillColor: '#60a5fa',
-                fillOpacity: 0.9,
-                weight: 2,
+                radius: 10,
+                color: style.stroke,
+                fillColor: style.fill,
+                fillOpacity: 0.95,
+                weight: 3,
             });
         } else {
-            const stroke = point.severity === 'High' ? '#991b1b' : (point.severity === 'Medium' ? '#9a3412' : '#166534');
-            const fill = point.severity === 'High' ? '#ef4444' : (point.severity === 'Medium' ? '#f59e0b' : '#22c55e');
-
             layer = L.circleMarker([point.lat, point.lng], {
-                radius: 10,
-                color: stroke,
-                fillColor: fill,
-                fillOpacity: 0.82,
+                radius: point.severity === 'High' ? 11 : 9,
+                color: style.stroke,
+                fillColor: style.fill,
+                fillOpacity: 0.86,
                 weight: 2,
             });
         }
 
         layer.addTo(previewMap).bindPopup(
-            `<strong>${point.title}</strong><br>${point.subtitle}<br>${point.note}<br>${point.coordinates}`
+            `<strong class="map-popup-title">${point.title}</strong>
+            <div class="map-popup-line">${point.subtitle}</div>
+            <div class="map-popup-line">${point.note}</div>
+            <div class="map-popup-line">${point.coordinates}</div>
+            <div class="map-popup-badges">
+                <span class="badge ${style.badge}">${point.severity}</span>
+                ${point.kind === 'family_pin' ? '<span class="badge badge-blue">Family Pin</span>' : '<span class="badge badge-green">Validated Area</span>'}
+            </div>`
         );
+
+        if (point.kind === 'family_pin') {
+            layer.on('mouseover', () => layer.openPopup());
+            layer.bringToFront();
+        }
 
         previewBounds.push([point.lat, point.lng]);
     });

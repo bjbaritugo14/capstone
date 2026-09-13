@@ -55,6 +55,8 @@ function buildEmptyForm(): ReportPayload {
 
 function buildEmptyFamily(): AffectedFamily {
   return {
+    firstName: '',
+    lastName: '',
     familyHeadName: '',
     householdMembers: 0,
     contactNumber: '',
@@ -64,6 +66,41 @@ function buildEmptyFamily(): AffectedFamily {
     latitude: '',
     longitude: '',
     photos: [],
+  };
+}
+
+function splitName(name?: string) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length <= 1) {
+    return {
+      firstName: parts[0] || '',
+      lastName: '',
+    };
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(' '),
+    lastName: parts[parts.length - 1],
+  };
+}
+
+function normalizeFamilyName(family: AffectedFamily): AffectedFamily {
+  if (family.firstName || family.lastName) {
+    return {
+      ...family,
+      firstName: family.firstName || '',
+      lastName: family.lastName || '',
+      familyHeadName: `${family.firstName || ''} ${family.lastName || ''}`.trim(),
+    };
+  }
+
+  const split = splitName(family.familyHeadName);
+
+  return {
+    ...family,
+    ...split,
+    familyHeadName: `${split.firstName} ${split.lastName}`.trim(),
   };
 }
 
@@ -88,6 +125,7 @@ export default function ReportFormScreen() {
       const { id, status, validationRemarks, validatedAt, validatedBy, createdAt, ...payload } = existingReport;
       setForm({
         ...payload,
+        families: payload.families.map(normalizeFamilyName),
         affectedStructures: payload.families.length,
       });
     } else {
@@ -221,7 +259,15 @@ export default function ReportFormScreen() {
       return;
     }
 
-    const familyWithCoordinates = form.families.find((family) => hasValidCoordinates(family.latitude, family.longitude));
+    const normalizedFamilies = form.families.map(normalizeFamilyName);
+    const familyMissingName = normalizedFamilies.some((family) => !family.firstName.trim() || !family.lastName.trim());
+
+    if (familyMissingName) {
+      Alert.alert('Missing name', 'Enter first name and last name for each affected family.');
+      return;
+    }
+
+    const familyWithCoordinates = normalizedFamilies.find((family) => hasValidCoordinates(family.latitude, family.longitude));
     const hasMapLocation = Boolean(familyWithCoordinates) || hasValidCoordinates(form.latitude, form.longitude);
 
     if (!hasMapLocation) {
@@ -231,12 +277,13 @@ export default function ReportFormScreen() {
 
     const submissionForm: ReportPayload = {
       ...form,
-      description: form.families[0]?.description || form.description || 'Disaster report',
-      severity: form.families[0]?.severity || form.severity,
+      families: normalizedFamilies,
+      description: normalizedFamilies[0]?.description || form.description || 'Disaster report',
+      severity: normalizedFamilies[0]?.severity || form.severity,
       latitude: familyWithCoordinates?.latitude || form.latitude,
       longitude: familyWithCoordinates?.longitude || form.longitude,
-      photos: form.families.flatMap((family) => family.photos || []),
-      affectedStructures: form.families.length,
+      photos: normalizedFamilies.flatMap((family) => family.photos || []),
+      affectedStructures: normalizedFamilies.length,
     };
 
     try {
@@ -260,7 +307,7 @@ export default function ReportFormScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.title}>{existingReport ? 'Edit report' : 'New report'}</Text>
+        <Text style={styles.title}>{existingReport ? 'Edit disaster damage report' : 'New disaster damage report'}</Text>
         {existingReport?.status === 'returned' ? (
           <View style={styles.noticeBox}>
             <Text style={styles.noticeTitle}>Returned report</Text>
@@ -270,7 +317,7 @@ export default function ReportFormScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Location</Text>
+        <Text style={styles.sectionTitle}>Barangay location</Text>
         <View style={styles.pickerWrapper}>
           <Picker selectedValue={form.barangay} onValueChange={(value) => setField('barangay', value)}>
             {barangayOptions.map((item) => (
@@ -280,7 +327,7 @@ export default function ReportFormScreen() {
         </View>
         <TextInput style={styles.input} placeholder="Purok" value={form.purok} onChangeText={(value) => setField('purok', value)} />
 
-        <Text style={styles.sectionTitle}>Disaster Type</Text>
+        <Text style={styles.sectionTitle}>Disaster type</Text>
         <View style={styles.pickerWrapper}>
           <Picker selectedValue={form.disasterType} onValueChange={(value) => setField('disasterType', value)}>
             {DISASTER_TYPES.map((item) => (
@@ -289,7 +336,7 @@ export default function ReportFormScreen() {
           </Picker>
         </View>
 
-        <Text style={styles.sectionTitle}>Date</Text>
+        <Text style={styles.sectionTitle}>Incident date</Text>
         <TextInput
           style={styles.input}
           placeholder="YYYY-MM-DD"
@@ -304,30 +351,31 @@ export default function ReportFormScreen() {
           <Text style={styles.secondaryButtonText}>Use today</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Affected Families</Text>
-        <Text style={styles.mutedText}>
-          Each family entry includes its own description, severity, location, and photos.
-          Affected structures: {form.families.length}
-        </Text>
-        <Text style={styles.mutedText}>
-          Capture GPS coordinates for at least one affected family so the report appears correctly on the GIS map.
-        </Text>
+        <Text style={styles.sectionTitle}>Affected family records ({form.families.length})</Text>
 
         {form.families.map((family, index) => (
           <View key={index} style={styles.familyCard}>
             <View style={styles.familyHeader}>
-              <Text style={styles.familyLabel}>Family #{index + 1}</Text>
+              <Text style={styles.familyLabel}>Affected family {index + 1}</Text>
               <TouchableOpacity onPress={() => removeFamily(index)}>
                 <Ionicons name="trash-outline" size={20} color="#dc2626" />
               </TouchableOpacity>
             </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Family head name"
-              value={family.familyHeadName}
-              onChangeText={(value) => updateFamily(index, 'familyHeadName', value)}
-            />
+            <View style={styles.nameRow}>
+              <TextInput
+                style={[styles.input, styles.nameInput]}
+                placeholder="First name"
+                value={family.firstName}
+                onChangeText={(value) => updateFamily(index, 'firstName', value)}
+              />
+              <TextInput
+                style={[styles.input, styles.nameInput]}
+                placeholder="Last name"
+                value={family.lastName}
+                onChangeText={(value) => updateFamily(index, 'lastName', value)}
+              />
+            </View>
             <TextInput
               style={styles.input}
               keyboardType="numeric"
@@ -355,7 +403,7 @@ export default function ReportFormScreen() {
               </Picker>
             </View>
 
-            <Text style={styles.subLabel}>Description</Text>
+            <Text style={styles.subLabel}>Family damage description</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               multiline
@@ -376,7 +424,7 @@ export default function ReportFormScreen() {
               </Picker>
             </View>
 
-            <Text style={styles.subLabel}>GPS Coordinates</Text>
+            <Text style={styles.subLabel}>Family GPS coordinates</Text>
             <View style={styles.gpsRow}>
               <TextInput
                 style={[styles.input, styles.halfInput]}
@@ -408,7 +456,7 @@ export default function ReportFormScreen() {
                   </TouchableOpacity>
                 ))
               ) : (
-                <Text style={styles.mutedText}>No photos yet.</Text>
+                <Text style={styles.mutedText}>No photos.</Text>
               )}
             </View>
             <TouchableOpacity style={styles.secondaryButton} onPress={() => pickFamilyImages(index)}>
@@ -526,6 +574,13 @@ const styles = StyleSheet.create({
   gpsRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  nameInput: {
+    flex: 1,
   },
   halfInput: {
     flex: 1,

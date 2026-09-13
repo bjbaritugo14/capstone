@@ -79,28 +79,6 @@
         margin-top: -6px;
     }
 
-    .validator-map-legend {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin-top: 12px;
-    }
-
-    .validator-map-legend span {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--muted);
-        font-size: 13px;
-    }
-
-    .validator-map-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 999px;
-        display: inline-block;
-    }
-
     .validator-help-list {
         display: grid;
         gap: 12px;
@@ -145,6 +123,8 @@
 @section('content')
 @php
     $defaultFamily = [
+        'firstName' => '',
+        'lastName' => '',
         'familyHeadName' => '',
         'householdMembers' => '',
         'contactNumber' => '',
@@ -159,11 +139,39 @@
     if (! is_array($oldFamilies) || count($oldFamilies) === 0) {
         $oldFamilies = [$defaultFamily];
     }
+    $oldFamilies = array_map(function (array $family): array {
+        $family = array_merge($defaultFamily, $family);
+
+        if (($family['firstName'] ?? '') === '' && ($family['lastName'] ?? '') === '' && ($family['familyHeadName'] ?? '') !== '') {
+            $parts = preg_split('/\s+/', trim((string) $family['familyHeadName'])) ?: [];
+            $family['lastName'] = count($parts) > 1 ? array_pop($parts) : '';
+            $family['firstName'] = implode(' ', $parts);
+        }
+
+        return $family;
+    }, $oldFamilies);
 
     $oldPeople = old('involvedPersons', []);
     if (! is_array($oldPeople)) {
         $oldPeople = [];
     }
+    $oldPeople = array_map(function (array $person): array {
+        $person = array_merge([
+            'firstName' => '',
+            'lastName' => '',
+            'personName' => '',
+            'role' => '',
+            'contactNumber' => '',
+        ], $person);
+
+        if (($person['firstName'] ?? '') === '' && ($person['lastName'] ?? '') === '' && ($person['personName'] ?? '') !== '') {
+            $parts = preg_split('/\s+/', trim((string) $person['personName'])) ?: [];
+            $person['lastName'] = count($parts) > 1 ? array_pop($parts) : '';
+            $person['firstName'] = implode(' ', $parts);
+        }
+
+        return $person;
+    }, $oldPeople);
 
     $disasterTypes = ['Flood', 'Typhoon', 'Landslide', 'Earthquake', 'Fire', 'Other'];
     $severityLevels = ['minor', 'moderate', 'severe'];
@@ -173,8 +181,7 @@
 <div class="page-header">
     <div>
         <div class="pill">Field Officer Web Reporting</div>
-        <h1>Browser Reporting Dashboard</h1>
-        <p class="muted">Use this web dashboard when the Expo app cannot send data from restricted lab computers or other firewall-limited devices.</p>
+        <h1>Field Officer Browser Reports</h1>
     </div>
     <div class="header-actions">
         <span class="badge badge-blue">Expo-style workflow</span>
@@ -219,8 +226,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Recent Submission Map</h2>
-                <p class="muted">Geotagged browser submissions appear here so you can confirm what was successfully sent from the web dashboard.</p>
+                <h2>Recent Geotagged Submissions</h2>
             </div>
             <span class="badge badge-blue">Leaflet</span>
         </div>
@@ -229,37 +235,23 @@
             <div id="validator-submission-map" class="map-canvas" aria-label="Field Officer submission map"></div>
         </div>
 
-        <div class="validator-map-legend">
-            <span><i class="validator-map-dot" style="background: #2563eb;"></i>Disaster report</span>
-            <span><i class="validator-map-dot" style="background: #0f766e;"></i>Accident report</span>
+        <div class="map-severity-legend" aria-label="Severity legend">
+            <span><i class="map-severity-dot low"></i><span class="badge badge-green">Low</span></span>
+            <span><i class="map-severity-dot medium"></i><span class="badge badge-amber">Medium</span></span>
+            <span><i class="map-severity-dot high"></i><span class="badge badge-red">High</span></span>
         </div>
     </section>
 
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>How To Use It</h2>
-                <p class="muted">This page is meant to be a browser fallback for the same data capture flow used in Expo.</p>
+                <h2>Browser Intake Forms</h2>
             </div>
         </div>
 
-        <div class="validator-help-list">
-            <div class="validator-help-item">
-                <strong>1. Pick the correct form</strong>
-                <span>Use the disaster form for affected families and the accident form for road incidents. Both save directly into the same Laravel database used by the rest of the system.</span>
-            </div>
-            <div class="validator-help-item">
-                <strong>2. Encode location and people details</strong>
-                <span>You can type coordinates manually or use browser location. Disaster entries also support multiple affected families with their own notes, severity, and GPS coordinates.</span>
-            </div>
-            <div class="validator-help-item">
-                <strong>3. Upload photos before sending</strong>
-                <span>The browser forms accept image uploads so you can still document the incident even when the Expo app is blocked on a lab computer.</span>
-            </div>
-        </div>
-
-        <div class="validator-note top-gap">
-            <strong>Tip:</strong> browser geolocation may be blocked on some PCs. If that happens, you can still encode the coordinates manually from your field notes and submit the record here.
+        <div class="mini-grid">
+            <div><span>Disaster Intake</span><strong>Affected families</strong></div>
+            <div><span>Accident Intake</span><strong>Road incidents</strong></div>
         </div>
     </section>
 </div>
@@ -268,8 +260,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Disaster Web Report</h2>
-                <p class="muted">Matches the Expo disaster intake with family-level entries, optional geotagging, and photo uploads.</p>
+                <h2>Browser Disaster Damage Report</h2>
             </div>
             <span class="badge badge-green">Pending Validation</span>
         </div>
@@ -332,7 +323,7 @@
                 <div class="validator-entry-header">
                     <div>
                         <strong>Primary GPS Coordinates</strong>
-                        <p class="validator-muted">These are the main map coordinates for the disaster report. If you leave them blank, the first family coordinates will be used when available.</p>
+                        <p class="validator-muted">Leave blank to use the first family GPS point.</p>
                     </div>
                     <button type="button" class="btn btn-secondary js-fill-location">Use Browser Location</button>
                 </div>
@@ -351,8 +342,7 @@
             <div>
                 <div class="section-heading compact-heading">
                     <div>
-                        <h2>Affected Families</h2>
-                        <p class="muted">Add each family the same way you would inside the Expo app.</p>
+                        <h2>Affected Family Records</h2>
                     </div>
                 </div>
 
@@ -377,8 +367,7 @@
     <section class="card">
         <div class="section-heading">
             <div>
-                <h2>Accident Web Report</h2>
-                <p class="muted">Browser version of the Expo vehicular accident form with involved persons, photos, and GPS coordinates.</p>
+                <h2>Browser Vehicular Accident Report</h2>
             </div>
             <span class="badge badge-amber">Recorded Status</span>
         </div>
@@ -444,16 +433,11 @@
                 </div>
             </div>
 
-            <div>
-                <label>Primary Person Name</label>
-                <input type="text" name="personName" value="{{ old('personName') }}" placeholder="Optional quick reference person name">
-            </div>
-
             <div class="validator-entry js-geo-row">
                 <div class="validator-entry-header">
                     <div>
                         <strong>Accident GPS Coordinates</strong>
-                        <p class="validator-muted">Use browser location when available, or type the coordinates from field notes.</p>
+                        <p class="validator-muted">Use browser location or type field-note coordinates.</p>
                     </div>
                     <button type="button" class="btn btn-secondary js-fill-location">Use Browser Location</button>
                 </div>
@@ -472,8 +456,7 @@
             <div>
                 <div class="section-heading compact-heading">
                     <div>
-                        <h2>Involved Persons</h2>
-                        <p class="muted">Optional repeated entries for drivers, passengers, or pedestrians.</p>
+                        <h2>Involved Person Records</h2>
                     </div>
                 </div>
 
@@ -499,8 +482,7 @@
 <section class="card top-gap">
     <div class="section-heading">
         <div>
-            <h2>My Recent Web Submissions</h2>
-            <p class="muted">Latest disaster and accident records submitted from this validator account through the browser dashboard.</p>
+            <h2>Recent Browser Submissions</h2>
         </div>
     </div>
 
@@ -546,7 +528,7 @@
     <div class="validator-entry">
         <div class="validator-entry-header">
             <div>
-                <strong>Family #<span class="js-entry-number">1</span></strong>
+                <strong>Affected family <span class="js-entry-number">1</span></strong>
                 <p class="validator-muted">Encode the same family-level details collected in the Expo app.</p>
             </div>
             <button type="button" class="btn btn-delete js-remove-entry">Remove</button>
@@ -554,13 +536,21 @@
 
         <div class="validator-subgrid">
             <div>
-                <label for="family-head-__INDEX__">Family Head Name</label>
-                <input type="text" id="family-head-__INDEX__" data-name-template="families[__INDEX__][familyHeadName]" data-id-template="family-head-__INDEX__" data-field="familyHeadName">
+                <label for="family-first-name-__INDEX__">First Name</label>
+                <input type="text" id="family-first-name-__INDEX__" data-name-template="families[__INDEX__][firstName]" data-id-template="family-first-name-__INDEX__" data-field="firstName" required>
             </div>
+            <div>
+                <label for="family-last-name-__INDEX__">Last Name</label>
+                <input type="text" id="family-last-name-__INDEX__" data-name-template="families[__INDEX__][lastName]" data-id-template="family-last-name-__INDEX__" data-field="lastName" required>
+            </div>
+        </div>
+
+        <div class="validator-subgrid">
             <div>
                 <label for="family-members-__INDEX__">Household Members</label>
                 <input type="number" min="1" id="family-members-__INDEX__" data-name-template="families[__INDEX__][householdMembers]" data-id-template="family-members-__INDEX__" data-field="householdMembers">
             </div>
+            <div></div>
         </div>
 
         <div class="validator-subgrid">
@@ -635,13 +625,21 @@
 
         <div class="validator-subgrid">
             <div>
-                <label for="person-name-__INDEX__">Full Name</label>
-                <input type="text" id="person-name-__INDEX__" data-name-template="involvedPersons[__INDEX__][personName]" data-id-template="person-name-__INDEX__" data-field="personName">
+                <label for="person-first-name-__INDEX__">First Name</label>
+                <input type="text" id="person-first-name-__INDEX__" data-name-template="involvedPersons[__INDEX__][firstName]" data-id-template="person-first-name-__INDEX__" data-field="firstName">
             </div>
+            <div>
+                <label for="person-last-name-__INDEX__">Last Name</label>
+                <input type="text" id="person-last-name-__INDEX__" data-name-template="involvedPersons[__INDEX__][lastName]" data-id-template="person-last-name-__INDEX__" data-field="lastName">
+            </div>
+        </div>
+
+        <div class="validator-subgrid">
             <div>
                 <label for="person-role-__INDEX__">Role</label>
                 <input type="text" id="person-role-__INDEX__" data-name-template="involvedPersons[__INDEX__][role]" data-id-template="person-role-__INDEX__" data-field="role" placeholder="Driver, Passenger, Pedestrian">
             </div>
+            <div></div>
         </div>
 
         <div>
@@ -675,19 +673,35 @@
     }).addTo(validatorMap);
 
     const validatorBounds = [];
+    const severityStyles = {
+        Low: { stroke: '#166534', fill: '#22c55e', badge: 'badge-green' },
+        Medium: { stroke: '#b45309', fill: '#f59e0b', badge: 'badge-amber' },
+        High: { stroke: '#b91c1c', fill: '#ef4444', badge: 'badge-red' },
+    };
+
+    function severityStyle(severity) {
+        return severityStyles[severity] || severityStyles.Low;
+    }
 
     validatorMapPoints.forEach((point) => {
         const isAccident = point.kind === 'accident';
+        const style = severityStyle(point.severity);
         const marker = L.circleMarker([point.lat, point.lng], {
-            radius: 8,
-            color: isAccident ? '#0f766e' : '#1d4ed8',
-            fillColor: isAccident ? '#14b8a6' : '#60a5fa',
-            fillOpacity: 0.82,
+            radius: point.severity === 'High' ? 10 : 8,
+            color: style.stroke,
+            fillColor: style.fill,
+            fillOpacity: 0.86,
             weight: 2,
         }).addTo(validatorMap);
 
         marker.bindPopup(
-            `<strong>${point.title}</strong><br>${point.subtitle}<br>${point.severity} | ${point.status}`
+            `<strong class="map-popup-title">${point.title}</strong>
+            <div class="map-popup-line">${point.subtitle}</div>
+            <div class="map-popup-badges">
+                <span class="badge ${style.badge}">${point.severity}</span>
+                <span class="badge ${isAccident ? 'badge-amber' : 'badge-blue'}">${isAccident ? 'Accident' : 'Disaster'}</span>
+                <span class="badge badge-green">${point.status}</span>
+            </div>`
         );
 
         validatorBounds.push([point.lat, point.lng]);

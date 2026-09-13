@@ -40,7 +40,7 @@ echo.
 set "EXPO_ENV=%EXPO_DIR%.env"
 echo [INFO] Updating Expo .env...
 (
-    echo EXPO_PUBLIC_USE_MOCK_API=false
+    echo EXPO_PUBLIC_USE_REAL_API=true
     echo EXPO_PUBLIC_API_BASE_URL=http://%LOCAL_IP%:8000/api
 ) > "%EXPO_ENV%"
 echo [OK] Expo .env updated with http://%LOCAL_IP%:8000/api
