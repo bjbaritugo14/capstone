@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "postgres:test": "node postgres-test.js",
+    "supabase:test": "node supabase.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "pg": "^8.23.0"
+  }
+}

@@ -81,6 +81,7 @@ echo ============================================
 echo.
 echo   Laravel API: http://%LOCAL_IP%:8000
 echo   Expo:        Check the Expo window for QR code
+echo   Note:        Your phone still must reach http://%LOCAL_IP%:8000 for API calls.
 echo.
 echo   Press any key to close this launcher window...
 pause > nul

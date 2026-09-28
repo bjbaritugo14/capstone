@@ -1,9 +1,9 @@
 # Laravel Backend Setup for `mdrrmo`
 
-This Expo app should not connect directly to MySQL. Connect it like this:
+This Expo app should not connect directly to Supabase/Postgres. Connect it like this:
 
 ```text
-Expo mobile app -> Laravel API -> MySQL database mdrrmo
+Expo mobile app -> Laravel API -> Supabase/Postgres database
 ```
 
 ## 1. Laravel `.env`
@@ -11,12 +11,13 @@ Expo mobile app -> Laravel API -> MySQL database mdrrmo
 In your Laravel web project, set:
 
 ```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=mdrrmo
-DB_USERNAME=root
-DB_PASSWORD=
+DB_CONNECTION=pgsql
+DB_HOST=db.YOUR_SUPABASE_PROJECT_REF.supabase.co
+DB_PORT=5432
+DB_DATABASE=postgres
+DB_USERNAME=postgres
+DB_PASSWORD=YOUR_SUPABASE_DATABASE_PASSWORD
+DB_SSLMODE=require
 ```
 
 If you use Laravel Sanctum for mobile login:
