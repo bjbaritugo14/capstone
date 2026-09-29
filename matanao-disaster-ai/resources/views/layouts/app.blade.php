@@ -136,13 +136,8 @@
             @yield('content')
         </main>
     </div>
-    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
     <script>
         (() => {
-            if (window.lucide) {
-                window.lucide.createIcons();
-            }
-
             const body = document.body;
             const toggle = document.querySelector('[data-sidebar-toggle]');
             const closeTargets = document.querySelectorAll('[data-sidebar-close], .nav-links a');

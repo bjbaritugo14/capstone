@@ -8,6 +8,7 @@ use App\Models\IncidentLocation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -112,31 +113,33 @@ class AccidentController extends Controller
             'incident_datetime' => ['required', 'date'],
         ]);
 
-        $location = IncidentLocation::create([
-            'barangay_id' => $validated['barangay_id'],
-            'latitude' => $validated['latitude'],
-            'longitude' => $validated['longitude'],
-            'road_segment' => $validated['road_segment'] ?? null,
-            'sitio_purok' => $validated['sitio_purok'] ?? null,
-        ]);
+        DB::transaction(function () use ($validated): void {
+            $location = IncidentLocation::create([
+                'barangay_id' => $validated['barangay_id'],
+                'latitude' => $validated['latitude'],
+                'longitude' => $validated['longitude'],
+                'road_segment' => $validated['road_segment'] ?? null,
+                'sitio_purok' => $validated['sitio_purok'] ?? null,
+            ]);
 
-        [$personFirstName, $personLastName] = $this->splitName($validated['involved_person_name'] ?? '');
+            [$personFirstName, $personLastName] = $this->splitName($validated['involved_person_name'] ?? '');
 
-        VehicularAccident::create([
-            'user_id' => Auth::id(),
-            'location_id' => $location->location_id,
-            'accident_type' => $validated['accident_type'],
-            'vehicle_type' => $validated['vehicle_type'] ?? null,
-            'involved_person_name' => $validated['involved_person_name'] ?? null,
-            'involved_person_first_name' => $personFirstName ?: null,
-            'involved_person_last_name' => $personLastName ?: null,
-            'description' => $validated['description'] ?? null,
-            'vehicles_involved' => $validated['vehicles_involved'] ?? 1,
-            'injured_count' => $validated['injured_count'] ?? 0,
-            'fatality_count' => $validated['fatality_count'] ?? 0,
-            'incident_datetime' => $validated['incident_datetime'],
-            'status' => 'recorded',
-        ]);
+            VehicularAccident::create([
+                'user_id' => Auth::id(),
+                'location_id' => $location->location_id,
+                'accident_type' => $validated['accident_type'],
+                'vehicle_type' => $validated['vehicle_type'] ?? null,
+                'involved_person_name' => $validated['involved_person_name'] ?? null,
+                'involved_person_first_name' => $personFirstName ?: null,
+                'involved_person_last_name' => $personLastName ?: null,
+                'description' => $validated['description'] ?? null,
+                'vehicles_involved' => $validated['vehicles_involved'] ?? 1,
+                'injured_count' => $validated['injured_count'] ?? 0,
+                'fatality_count' => $validated['fatality_count'] ?? 0,
+                'incident_datetime' => $validated['incident_datetime'],
+                'status' => 'recorded',
+            ]);
+        });
 
         return redirect()->route('accidents.index')->with('status', 'Vehicular accident record saved.');
     }

@@ -10,6 +10,7 @@ use App\Services\SystemSettingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -214,38 +215,46 @@ class ReportController extends Controller
             ->filter(fn (array $family) => filled($family['family_head_name'] ?? null))
             ->values();
 
-        $location = IncidentLocation::create([
-            'barangay_id' => $validated['barangay_id'],
-            'latitude' => $validated['latitude'],
-            'longitude' => $validated['longitude'],
-            'road_segment' => $validated['road_segment'] ?? null,
-            'sitio_purok' => $validated['sitio_purok'] ?? null,
-        ]);
-
-        $report = DamageReport::create([
-            'user_id' => Auth::id(),
-            'location_id' => $location->location_id,
-            'disaster_type' => $validated['disaster_type'],
-            'description' => $validated['description'] ?? null,
-            'damage_severity' => $validated['damage_severity'],
-            'affected_families' => $familyRows->isNotEmpty() ? $familyRows->count() : ($validated['affected_families'] ?? 0),
-            'affected_structures' => $validated['affected_structures'] ?? 0,
-            'incident_datetime' => $validated['incident_datetime'],
-            'status' => 'pending',
-        ]);
-
-        $familyRows->each(function (array $family) use ($report): void {
-            [$firstName, $lastName] = $this->splitName($family['family_head_name']);
-
-            AffectedFamily::create([
-                'report_id' => $report->report_id,
-                'family_head_name' => $family['family_head_name'],
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'household_members' => $family['household_members'] ?? 1,
-                'contact_number' => $family['contact_number'] ?? null,
-                'evacuation_status' => $family['evacuation_status'] ?? null,
+        DB::transaction(function () use ($validated, $familyRows): void {
+            $location = IncidentLocation::create([
+                'barangay_id' => $validated['barangay_id'],
+                'latitude' => $validated['latitude'],
+                'longitude' => $validated['longitude'],
+                'road_segment' => $validated['road_segment'] ?? null,
+                'sitio_purok' => $validated['sitio_purok'] ?? null,
             ]);
+
+            $report = DamageReport::create([
+                'user_id' => Auth::id(),
+                'location_id' => $location->location_id,
+                'disaster_type' => $validated['disaster_type'],
+                'description' => $validated['description'] ?? null,
+                'damage_severity' => $validated['damage_severity'],
+                'affected_families' => $familyRows->isNotEmpty() ? $familyRows->count() : ($validated['affected_families'] ?? 0),
+                'affected_structures' => $validated['affected_structures'] ?? 0,
+                'incident_datetime' => $validated['incident_datetime'],
+                'status' => 'pending',
+            ]);
+
+            $familyPayload = $familyRows
+                ->map(function (array $family) use ($report): array {
+                    [$firstName, $lastName] = $this->splitName($family['family_head_name']);
+
+                    return [
+                        'report_id' => $report->report_id,
+                        'family_head_name' => $family['family_head_name'],
+                        'first_name' => $firstName,
+                        'last_name' => $lastName,
+                        'household_members' => $family['household_members'] ?? 1,
+                        'contact_number' => $family['contact_number'] ?? null,
+                        'evacuation_status' => $family['evacuation_status'] ?? null,
+                    ];
+                })
+                ->all();
+
+            if ($familyPayload !== []) {
+                AffectedFamily::query()->insert($familyPayload);
+            }
         });
 
         return redirect()->route('reports.index')->with('status', 'Disaster report saved.');
