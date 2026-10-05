@@ -211,7 +211,7 @@ class MobileReportController extends Controller
 
         // Delete old images from storage
         foreach ($report->images as $image) {
-            Storage::disk('public')->delete($image->image_path);
+            Storage::disk('public')->delete($this->storedImagePath($image->image_path));
         }
         $report->images()->delete();
 
@@ -248,10 +248,16 @@ class MobileReportController extends Controller
             // Re-add existing per-family photos
             $existingKey = "existing_family_photos_{$index}";
             foreach ($request->input($existingKey, []) as $existingPath) {
+                $storedPath = $this->storedImagePath($existingPath);
+
+                if ($storedPath === null) {
+                    continue;
+                }
+
                 ReportImage::create([
                     'report_id' => $report->report_id,
                     'family_id' => $familyRecord->family_id,
-                    'image_path' => $existingPath,
+                    'image_path' => $storedPath,
                 ]);
             }
         }
@@ -281,7 +287,7 @@ class MobileReportController extends Controller
 
         // Delete stored images
         foreach ($report->images as $image) {
-            Storage::disk('public')->delete($image->image_path);
+            Storage::disk('public')->delete($this->storedImagePath($image->image_path));
         }
 
         $report->delete();
@@ -434,11 +440,18 @@ class MobileReportController extends Controller
                     'severity' => $f->damage_severity ?? $report->damage_severity,
                     'latitude' => $f->latitude ? (string) $f->latitude : '',
                     'longitude' => $f->longitude ? (string) $f->longitude : '',
-                    'photos' => $f->images->pluck('image_path')->all(),
+                    'photos' => $f->images
+                        ->map(fn (ReportImage $image): string => $this->publicImageUrl($image->image_path))
+                        ->values()
+                        ->all(),
                 ];
             })->all(),
             'affectedStructures' => $report->affected_structures,
-            'photos' => $report->images->whereNull('family_id')->pluck('image_path')->all(),
+            'photos' => $report->images
+                ->whereNull('family_id')
+                ->map(fn (ReportImage $image): string => $this->publicImageUrl($image->image_path))
+                ->values()
+                ->all(),
             'longitude' => $this->hasCoordinates($report->location?->longitude, $report->location?->latitude)
                 ? (string) $report->location?->longitude
                 : '',
@@ -452,5 +465,35 @@ class MobileReportController extends Controller
             'validatedBy' => $showValidationFeedback ? ($latestValidation?->validator?->full_name ?? '') : '',
             'createdAt' => (string) $report->created_at,
         ];
+    }
+
+    protected function publicImageUrl(mixed $path): string
+    {
+        $storedPath = $this->storedImagePath($path);
+
+        return $storedPath === null ? '' : asset('storage/'.$storedPath);
+    }
+
+    protected function storedImagePath(mixed $path): ?string
+    {
+        $value = trim(str_replace('\\', '/', (string) $path));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            $value = rawurldecode((string) parse_url($value, PHP_URL_PATH));
+        }
+
+        $value = ltrim($value, '/');
+
+        foreach (['public/storage/', 'storage/'] as $prefix) {
+            if (str_starts_with($value, $prefix)) {
+                $value = substr($value, strlen($prefix));
+            }
+        }
+
+        return $value === '' ? null : $value;
     }
 }
