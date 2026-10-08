@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', fn () => redirect()->route('login'));
 
 Route::get('/login', [LoginController::class, 'create'])->name('login');
+Route::get('/login/csrf-token', [LoginController::class, 'csrfToken'])->name('login.csrf-token');
 Route::post('/login', [LoginController::class, 'store'])->name('login.store');
 Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 

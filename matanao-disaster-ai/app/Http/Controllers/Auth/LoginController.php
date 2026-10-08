@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Illuminate\Http\Response;
 
 class LoginController extends Controller
 {
@@ -22,9 +23,16 @@ class LoginController extends Controller
      */
     protected const LOCKOUT_SECONDS = 30;
 
-    public function create(): View
+    public function create(): Response
     {
-        return view('auth.login');
+        return response()->view('auth.login')->header('Cache-Control', 'no-store, private');
+    }
+
+    public function csrfToken(Request $request): JsonResponse
+    {
+        return response()->json([
+            'token' => $request->session()->token(),
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function store(Request $request): RedirectResponse

@@ -71,7 +71,7 @@
                 <span class="badge badge-blue">Secure Access</span>
             </div>
 
-            <form method="POST" action="{{ route('login.store') }}" class="form-grid auth-login-form">
+            <form method="POST" action="{{ route('login.store', [], false) }}" class="form-grid auth-login-form" data-csrf-url="{{ route('login.csrf-token', [], false) }}">
                 @csrf
                 @if(session('status'))
                     <div class="form-success">{{ session('status') }}</div>
@@ -79,6 +79,7 @@
                 @if ($errors->any())
                     <div class="form-error">{{ $errors->first() }}</div>
                 @endif
+                <div class="form-error" role="alert" data-login-error hidden></div>
                 <div class="auth-field">
                     <label for="email">Email address</label>
                     <div class="input-shell">
@@ -118,6 +119,49 @@
     </section>
     <script>
         (() => {
+            const form = document.querySelector('.auth-login-form');
+            const submit = form.querySelector('[type="submit"]');
+            const error = form.querySelector('[data-login-error]');
+            let submitting = false;
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (submitting) return;
+
+                submitting = true;
+                submit.disabled = true;
+                error.hidden = true;
+
+                try {
+                    // Login/logout in another tab can replace this form's session token.
+                    const response = await fetch(form.dataset.csrfUrl, {
+                        credentials: 'same-origin',
+                        cache: 'no-store',
+                        headers: { Accept: 'application/json' },
+                        signal: AbortSignal.timeout(15000),
+                    });
+                    if (!response.ok) throw new Error('Session refresh failed');
+
+                    const data = await response.json();
+                    if (typeof data.token !== 'string' || !data.token) {
+                        throw new Error('Missing session token');
+                    }
+
+                    form.elements.namedItem('_token').value = data.token;
+                    HTMLFormElement.prototype.submit.call(form);
+                } catch {
+                    error.textContent = 'Unable to connect. Please try signing in again.';
+                    error.hidden = false;
+                    submitting = false;
+                    submit.disabled = false;
+                }
+            });
+
+            window.addEventListener('pageshow', () => {
+                submitting = false;
+                submit.disabled = false;
+            });
+
             const input = document.querySelector('[data-password-input]');
             const toggle = document.querySelector('[data-password-toggle]');
 
