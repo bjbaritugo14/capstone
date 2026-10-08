@@ -143,9 +143,10 @@ export const api = {
       });
     });
 
-    // Also send top-level photos if any (backward compat)
+    // The form also aggregates family photos at the top level; upload each only once.
+    const familyPhotoUris = new Set((payload.families || []).flatMap((family) => family.photos || []));
     (payload.photos || []).forEach((uri, index) => {
-      if (uri) {
+      if (uri && !familyPhotoUris.has(uri)) {
         const filename = uri.split('/').pop() || `photo_${index}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
         const ext = match ? match[1] : 'jpg';

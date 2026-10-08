@@ -7,6 +7,24 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Mobile Photo Uploads
+
+The report and accident APIs accept images up to 10 MB each. PHP must accept
+the upload before Laravel can validate it. In the active `php.ini` shown by
+`php --ini`, configure:
+
+```ini
+upload_max_filesize = 10M
+post_max_size = 64M
+max_file_uploads = 100
+```
+
+Restart the PHP server after changing these settings. On this Windows development
+machine, the active file is `C:\php\php.ini`. The 64 MB limit applies to the entire
+request, including all photos. A reverse proxy, if used, must allow the same size.
+Keep per-family uploads in `family_photos_<index>[]`; do not duplicate them in
+the legacy top-level `photos[]` field.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

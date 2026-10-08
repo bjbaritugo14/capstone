@@ -68,6 +68,7 @@ class MobileReportController extends Controller
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'reportDate' => ['required', 'date'],
+            ...$this->familyPhotoRules($request),
         ]);
 
         try {
@@ -182,6 +183,7 @@ class MobileReportController extends Controller
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'reportDate' => ['required', 'date'],
+            ...$this->familyPhotoRules($request),
         ]);
 
         $barangay = $this->barangayFromPayload($validated);
@@ -279,6 +281,20 @@ class MobileReportController extends Controller
             'affectedFamilyRecords.images',
             'validations' => fn ($query) => $query->with('validator')->latest('validated_at'),
         ])));
+    }
+
+    private function familyPhotoRules(Request $request): array
+    {
+        $rules = [];
+
+        foreach (array_keys($request->all()) as $key) {
+            if (preg_match('/^family_photos_\d+$/', $key)) {
+                $rules[$key] = ['nullable', 'array'];
+                $rules[$key.'.*'] = ['file', 'image', 'max:10240'];
+            }
+        }
+
+        return $rules;
     }
 
     public function destroy(Request $request, DamageReport $report): JsonResponse

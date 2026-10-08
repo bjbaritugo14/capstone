@@ -293,6 +293,8 @@ export default function ReportFormScreen() {
       } else {
         await createReport(submissionForm);
       }
+      setForm(buildEmptyForm());
+      router.setParams({ id: '' });
       Alert.alert('Success', existingReport ? 'Report updated and sent back for review.' : 'Report submitted and saved to server.');
       router.replace('/(tabs)/dashboard');
     } catch (error) {

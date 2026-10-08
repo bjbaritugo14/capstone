@@ -10,7 +10,9 @@ use App\Models\ReportImage;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -255,6 +257,98 @@ class MobileReportApiTest extends TestCase
         $this->assertDatabaseMissing('report_images', [
             'image_path' => $photoUrl,
         ]);
+    }
+
+    public function test_mobile_report_stores_a_family_photo_larger_than_two_megabytes(): void
+    {
+        Storage::fake('public');
+        Sanctum::actingAs($this->createFieldUser());
+        $payload = $this->photoPayload();
+        $photo = $this->photoFile(3072);
+
+        $this->post('/api/reports', $payload + ['family_photos_0' => [$photo]], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonCount(1, 'families.0.photos')
+            ->assertJsonCount(0, 'photos');
+
+        $image = ReportImage::firstOrFail();
+        $this->assertNotNull($image->family_id);
+        Storage::disk('public')->assertExists($image->image_path);
+        $this->assertDatabaseCount('report_images', 1);
+    }
+
+    public function test_mobile_report_rejects_failed_or_oversized_family_uploads_before_saving(): void
+    {
+        Storage::fake('public');
+        Sanctum::actingAs($this->createFieldUser());
+        $payload = $this->photoPayload();
+        $failed = new UploadedFile(__FILE__, 'family.jpg', 'image/jpeg', UPLOAD_ERR_INI_SIZE, true);
+        $oversized = $this->photoFile(10241);
+        $notImage = UploadedFile::fake()->create('notes.txt', 1, 'text/plain');
+
+        foreach ([$failed, $oversized, $notImage] as $photo) {
+            $this->post('/api/reports', $payload + ['family_photos_0' => [$photo]], ['Accept' => 'application/json'])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('family_photos_0.0');
+        }
+
+        $this->assertDatabaseCount('disaster_reports', 0);
+        $this->assertDatabaseCount('report_images', 0);
+    }
+
+    public function test_failed_family_upload_does_not_change_an_existing_report(): void
+    {
+        Storage::fake('public');
+        Sanctum::actingAs($this->createFieldUser());
+        $payload = $this->photoPayload();
+        $id = $this->post('/api/reports', $payload + [
+            'family_photos_0' => [$this->photoFile()],
+        ], ['Accept' => 'application/json'])->assertCreated()->json('id');
+        $image = ReportImage::firstOrFail();
+
+        $this->post('/api/reports/'.$id, array_merge($payload, [
+            '_method' => 'PUT',
+            'description' => 'This update must not be saved.',
+            'family_photos_0' => [new UploadedFile(__FILE__, 'family.jpg', 'image/jpeg', UPLOAD_ERR_PARTIAL, true)],
+        ]), ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('family_photos_0.0');
+
+        $this->assertDatabaseHas('disaster_reports', ['report_id' => $id, 'description' => $payload['description']]);
+        Storage::disk('public')->assertExists($image->image_path);
+        $this->assertDatabaseCount('report_images', 1);
+    }
+
+    private function photoFile(int $kilobytes = 1): UploadedFile
+    {
+        // Use a tiny PNG fixture so upload tests do not require the GD extension.
+        return UploadedFile::fake()->createWithContent('family.png', base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1sAAAAASUVORK5CYII='
+        ))->size($kilobytes);
+    }
+
+    private function photoPayload(): array
+    {
+        Barangay::firstOrCreate(['barangay_name' => 'Asbang'], [
+            'municipality' => 'Matanao',
+            'province' => 'Davao del Sur',
+            'status' => 'active',
+        ]);
+
+        return [
+            'barangay' => 'Asbang',
+            'description' => 'Flood damage with photo.',
+            'disasterType' => 'Flood',
+            'severity' => 'moderate',
+            'reportDate' => '2026-10-08',
+            'latitude' => '6.688099',
+            'longitude' => '125.166607',
+            'families' => json_encode([[
+                'firstName' => 'Juan',
+                'lastName' => 'Dela Cruz',
+                'householdMembers' => 4,
+            ]]),
+        ];
     }
 
     private function createFieldUser(): User
