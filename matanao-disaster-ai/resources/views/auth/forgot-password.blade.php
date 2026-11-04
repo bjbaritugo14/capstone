@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forgot Password | Matanao MDRRMO</title>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-theme.css') }}">
 </head>
 <body class="auth-body">
     <section class="auth-shell" style="grid-template-columns: 1fr; max-width: 480px;">

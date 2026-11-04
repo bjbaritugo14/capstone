@@ -12,29 +12,30 @@
 @section('content')
 <div class="page-header">
     <div>
-        <h1>Matanao Incident Assessment Dashboard</h1>
+        <h1>Incident Assessment Dashboard</h1>
+        <p class="muted">Monitor incidents, community impact, and response priorities across Matanao.</p>
     </div>
     <div class="header-actions">
-        <a href="{{ route('reports.index') }}" class="btn btn-primary">Open Field Records</a>
+        <a href="{{ route('reports.index') }}" class="btn btn-primary"><x-icon name="database" />Open Field Records</a>
     </div>
 </div>
 
 <div class="stats-grid">
-    <div class="stat-card">
-        <span>Web Submissions</span>
-        <strong>{{ $stats['web_submissions'] }}</strong>
+    <div class="stat-card overview-stat">
+        <div><span>Web Submissions</span><strong>{{ number_format($stats['web_submissions']) }}</strong><small>Total disaster reports</small></div>
+        <div class="stat-icon"><x-icon name="database" /></div>
     </div>
-    <div class="stat-card">
-        <span>Validated</span>
-        <strong>{{ $stats['validated_reports'] }}</strong>
+    <div class="stat-card overview-stat">
+        <div><span>Validated</span><strong>{{ number_format($stats['validated_reports']) }}</strong><small>Verified disaster reports</small></div>
+        <div class="stat-icon green"><x-icon name="clipboard-check" /></div>
     </div>
-    <div class="stat-card">
-        <span>Affected Households</span>
-        <strong>{{ $stats['affected_households'] }}</strong>
+    <div class="stat-card overview-stat">
+        <div><span>Affected Households</span><strong>{{ number_format($stats['affected_households']) }}</strong><small>Across reported incidents</small></div>
+        <div class="stat-icon purple"><x-icon name="users" /></div>
     </div>
-    <div class="stat-card">
-        <span>Accident Logs</span>
-        <strong>{{ $stats['accident_logs'] }}</strong>
+    <div class="stat-card overview-stat">
+        <div><span>Accident Logs</span><strong>{{ number_format($stats['accident_logs']) }}</strong><small>Total vehicular incidents</small></div>
+        <div class="stat-icon amber"><x-icon name="car" /></div>
     </div>
 </div>
 
@@ -43,8 +44,9 @@
         <div class="section-heading">
             <div>
                 <h2>Matanao GIS Incident Map</h2>
+                <p class="muted">Geographic overview of reported incidents</p>
             </div>
-            <span class="badge badge-blue">Leaflet</span>
+            <span class="badge badge-blue">Incident locations</span>
         </div>
         <div class="map-shell">
             <div id="matanao-map" class="map-canvas" aria-label="Map of Matanao"></div>
@@ -65,7 +67,7 @@
         </div>
 
         <div class="stack-list">
-            @foreach($recommendations as $item)
+            @forelse($recommendations as $item)
                 <div class="stack-item">
                     <div class="stack-head">
                         <strong>{{ $item['barangay'] }}</strong>
@@ -78,7 +80,9 @@
                     </div>
                     <p class="item-note">{{ $item['basis'] }}</p>
                 </div>
-            @endforeach
+            @empty
+                <p class="empty-state">No relief recommendations yet.</p>
+            @endforelse
         </div>
     </section>
 </div>
@@ -91,7 +95,7 @@
             </div>
         </div>
         <div class="list-table">
-            @foreach($impactByBarangay as $row)
+            @forelse($impactByBarangay as $row)
                 <div class="list-row">
                     <div>
                         <strong>{{ $row['name'] }}</strong>
@@ -99,7 +103,9 @@
                     </div>
                     <span class="badge badge-{{ strtolower($row['severity']) === 'high' ? 'red' : (strtolower($row['severity']) === 'medium' ? 'amber' : 'green') }}">{{ $row['severity'] }}</span>
                 </div>
-            @endforeach
+            @empty
+                <p class="empty-state">No affected barangays reported yet.</p>
+            @endforelse
         </div>
     </section>
 
@@ -121,15 +127,17 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($recentReports as $report)
+                    @forelse($recentReports as $report)
                         <tr>
                             <td>{{ $report['code'] }}</td>
                             <td>{{ $report['incident_type'] }}</td>
                             <td>{{ $report['barangay'] }}</td>
-                            <td>{{ $report['severity'] }}</td>
-                            <td>{{ $report['status'] }}</td>
+                            <td><span class="badge badge-{{ strtolower($report['severity']) === 'high' ? 'red' : (strtolower($report['severity']) === 'medium' ? 'amber' : 'green') }}">{{ $report['severity'] }}</span></td>
+                            <td><span class="badge badge-{{ strtolower($report['status']) === 'validated' ? 'green' : 'blue' }}">{{ $report['status'] }}</span></td>
                         </tr>
-                    @endforeach
+                    @empty
+                        <tr><td colspan="5" class="empty-state">No incidents submitted yet.</td></tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -144,7 +152,7 @@
             </div>
         </div>
         <div class="list-table">
-            @foreach($accidentSummaries as $summary)
+            @forelse($accidentSummaries as $summary)
                 <div class="list-row">
                     <div>
                         <strong>{{ $summary['location'] }}</strong>
@@ -152,7 +160,9 @@
                     </div>
                     <span class="badge badge-{{ strtolower($summary['trend']) === 'high' ? 'red' : (strtolower($summary['trend']) === 'medium' ? 'amber' : 'green') }}">{{ $summary['trend'] }}</span>
                 </div>
-            @endforeach
+            @empty
+                <p class="empty-state">No accident hotspots recorded yet.</p>
+            @endforelse
         </div>
     </section>
 
