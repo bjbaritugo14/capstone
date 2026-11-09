@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Admin Oversight</div>
         <h1>Add Barangay Option</h1>
-        <p class="muted">Create a barangay entry that will appear in web reporting forms and in the Expo mobile app.</p>
     </div>
     <div class="header-actions">
         <a href="{{ route('admin.settings') }}" class="btn btn-secondary">Back to System Settings</a>
@@ -24,7 +22,6 @@
     <div class="section-heading">
         <div>
             <h2>Create Barangay</h2>
-            <p class="muted">New barangays can be marked active right away or kept inactive until they are ready for use.</p>
         </div>
     </div>
 

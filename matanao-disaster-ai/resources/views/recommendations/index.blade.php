@@ -3,7 +3,6 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Decision Tree Recommendation Module</div>
         <h1>Barangay Relief Recommendations</h1>
     </div>
 </div>

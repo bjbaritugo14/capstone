@@ -12,7 +12,6 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">DSWD Disaster Dashboard</div>
         <h1>Validated Affected Families Overview</h1>
     </div>
     <div class="header-actions">
@@ -110,7 +109,6 @@
             <div>
                 <h2>Mapped Validated Areas</h2>
             </div>
-            <span class="badge badge-blue">GIS Module</span>
         </div>
 
         <div class="mini-grid">
@@ -148,7 +146,6 @@
             <div>
                 <h2>Validated Area Map Preview</h2>
             </div>
-            <span class="badge badge-blue">Map View</span>
         </div>
 
         <div class="map-shell">

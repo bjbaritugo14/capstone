@@ -13,7 +13,6 @@
             <div class="section-heading compact-heading">
                 <div>
                     <h2>Forgot Password</h2>
-                    <p class="muted">Enter your email address and we'll send you a link to reset your password.</p>
                 </div>
             </div>
 

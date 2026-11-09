@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Admin Oversight</div>
         <h1>{{ $barangay->barangay_name }}</h1>
-        <p class="muted">Manage this barangay option and control whether it remains selectable for web and mobile reporting.</p>
     </div>
     <div class="header-actions">
         <a href="{{ route('admin.settings') }}" class="btn btn-secondary">Back to System Settings</a>
@@ -24,7 +22,6 @@
     <div class="section-heading">
         <div>
             <h2>Edit Barangay</h2>
-            <p class="muted">Update the barangay details below. Inactive barangays are hidden from new submissions.</p>
         </div>
         <span class="badge badge-{{ $barangay->status === 'active' ? 'green' : 'amber' }}">{{ ucfirst($barangay->status) }}</span>
     </div>

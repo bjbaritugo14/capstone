@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">DSWD Assistance View</div>
         <h1>Resource Recommendations</h1>
-        <p class="muted">Validated disaster recommendations for food packs, medicine kits, and cash assistance coordination.</p>
     </div>
 </div>
 
@@ -32,7 +30,6 @@
     <div class="section-heading">
         <div>
             <h2>Recommendation Records</h2>
-            <p class="muted">Use this validated-only list for relief planning, release coordination, and case review.</p>
         </div>
     </div>
 

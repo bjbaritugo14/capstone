@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Super Admin</div>
         <h1>User Accounts</h1>
-        <p class="muted">Create accounts, assign roles, activate/deactivate users, and reset passwords. All account changes are recorded in the audit trail.</p>
     </div>
 </div>
 
@@ -13,12 +11,11 @@
     <div class="form-error">{{ $errors->first() }}</div>
 @endif
 
-<div class="content-grid two-columns">
+<div class="content-grid">
     <section class="card">
         <div class="section-heading">
             <div>
                 <h2>Create Account</h2>
-                <p class="muted">Only super admin/admin users should create system accounts.</p>
             </div>
         </div>
 
@@ -58,27 +55,12 @@
             <button type="submit" class="btn btn-primary">Create User</button>
         </form>
     </section>
-
-    <section class="card">
-        <div class="section-heading">
-            <div>
-                <h2>Admin Rules</h2>
-                <p class="muted">Recommended account responsibilities.</p>
-            </div>
-        </div>
-        <div class="timeline-list">
-            <div class="timeline-item"><span>1</span><p>Admin creates MDRRMO, DSWD, and field officer accounts.</p></div>
-            <div class="timeline-item"><span>2</span><p>Admin can reset a user's password if the user forgets it.</p></div>
-            <div class="timeline-item"><span>3</span><p>Inactive accounts cannot log in.</p></div>
-        </div>
-    </section>
 </div>
 
 <section class="card top-gap">
     <div class="section-heading">
         <div>
             <h2>Existing Users</h2>
-            <p class="muted">Edit account profile, role, status, or password.</p>
         </div>
     </div>
 

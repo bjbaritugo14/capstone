@@ -12,9 +12,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">DSWD Validated Area Module</div>
         <h1>Validated Affected Areas GIS Map</h1>
-        <p class="muted">Review validated affected areas, inspect mapped family pins, and monitor relief coverage by barangay.</p>
     </div>
     <div class="header-actions">
         <a href="{{ route('dswd.dashboard') }}" class="btn btn-secondary">Back to DSWD Dashboard</a>
@@ -47,7 +45,6 @@
                 <h2>Validated Area GIS Map</h2>
                 <p class="muted">Red, amber, and green circles represent validated affected areas. Small blue markers represent geotagged family locations.</p>
             </div>
-            <span class="badge badge-blue">Leaflet</span>
         </div>
 
         <div class="map-shell">
@@ -72,7 +69,6 @@
         <div class="section-heading">
             <div>
                 <h2>Barangay Coverage</h2>
-                <p class="muted">Validated-area totals per barangay to help DSWD prioritize site visits and relief dispatch.</p>
             </div>
         </div>
 
@@ -101,7 +97,6 @@
     <div class="section-heading">
         <div>
             <h2>Validated Affected Area Records</h2>
-            <p class="muted">Only validated disaster reports appear here, including their latest validation details and available family-level coordinates.</p>
         </div>
     </div>
 
@@ -150,7 +145,6 @@
         <div class="section-heading">
             <div>
                 <h2>Latest Validated Areas</h2>
-                <p class="muted">Area-by-area snapshots for rapid case review during DSWD coordination.</p>
             </div>
         </div>
 
@@ -187,7 +181,6 @@
         <div class="section-heading">
             <div>
                 <h2>Family Coordinate Availability</h2>
-                <p class="muted">Quick guide to how precise the validated-area GIS coverage currently is.</p>
             </div>
         </div>
 
@@ -199,13 +192,11 @@
                 <small>Each one is sourced from an MDRRMO-validated disaster report.</small>
             </div>
             <div class="analytics-card">
-                <span class="badge badge-blue">Pinpointed</span>
                 <strong>{{ $stats['family_pins'] }}</strong>
                 <p>family-level coordinates can be opened directly on the GIS map</p>
                 <small>These are especially useful for hard-to-reach sitio support.</small>
             </div>
             <div class="analytics-card">
-                <span class="badge badge-amber">Coverage</span>
                 <strong>{{ $stats['covered_barangays'] }}</strong>
                 <p>barangays currently represented in the validated DSWD view</p>
                 <small>Use this to spot gaps before dispatching assistance.</small>

@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Admin Oversight</div>
         <h1>Incident/Data Management</h1>
-        <p class="muted">View submitted reports, edit incorrect records, archive old records, and search or filter across disaster and accident data.</p>
     </div>
 </div>
 

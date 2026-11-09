@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Admin Oversight</div>
         <h1>Recommendation Configuration</h1>
-        <p class="muted">Manage the Decision Tree settings, assistance computation values, impact thresholds, and optional Ollama refinement.</p>
     </div>
     <div class="header-actions">
         <a href="{{ route('admin.settings') }}" class="btn btn-secondary">Back to System Settings</a>
@@ -24,7 +22,6 @@
     <div class="section-heading">
         <div>
             <h2>Recommendation Rules</h2>
-            <p class="muted">Decision Tree remains the primary algorithm. Food packs use fixed household-size rules; these settings control medicine, cash, thresholds, and optional Ollama refinement.</p>
         </div>
     </div>
 

@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Validation Review</div>
         <h1>ACC-{{ str_pad((string) $accident->accident_id, 4, '0', STR_PAD_LEFT) }}</h1>
-        <p class="muted">Vehicular Accident record submitted from mobile. Review all data below then validate or return.</p>
     </div>
     <a href="{{ route('validation.index') }}" class="btn btn-secondary">← Back to Queue</a>
 </div>
@@ -18,7 +16,6 @@
             <div class="section-heading">
                 <div>
                     <h2>Accident Details</h2>
-                    <p class="muted">Core information submitted by the field reporter.</p>
                 </div>
                 <span class="badge badge-{{ $accident->fatality_count > 0 ? 'red' : ($accident->injured_count > 0 ? 'amber' : 'green') }}">
                     {{ $accident->fatality_count > 0 ? 'Fatal' : ($accident->injured_count > 0 ? 'Injury' : 'Damage Only') }}
@@ -139,7 +136,6 @@
             <div class="section-heading">
                 <div>
                     <h2>Validation Action</h2>
-                    <p class="muted">Validate to approve or return with a reason.</p>
                 </div>
             </div>
 

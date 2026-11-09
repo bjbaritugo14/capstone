@@ -12,7 +12,6 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Vehicular Accident Module</div>
         <h1>Matanao Vehicular Accident Map</h1>
     </div>
 </div>
@@ -46,7 +45,6 @@
             <div>
                 <h2>Geotagged Accident Reports</h2>
             </div>
-            <span class="badge badge-blue">Leaflet</span>
         </div>
         <div class="map-shell">
             <div id="accident-map" class="map-canvas" aria-label="Vehicular accident map"></div>

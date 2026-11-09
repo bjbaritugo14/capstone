@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Printable Output</div>
         <h1>{{ $selectedBarangay ? $selectedBarangay->barangay_name.' Assistance List' : 'Barangay Assistance List' }}</h1>
-        <p class="muted">Printable list of affected families grouped per barangay, including recommended food packs, medical kits, and money assistance.</p>
     </div>
     <div class="header-actions no-print">
         <button type="button" class="btn btn-primary" onclick="window.print()">Print</button>

@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Admin Oversight</div>
         <h1>Audit Trail</h1>
-        <p class="muted">Review account changes, validation actions, and recommendation generation records across the system.</p>
     </div>
 </div>
 
@@ -64,7 +62,6 @@
         <div class="section-heading">
             <div>
                 <h2>Audit Event Table</h2>
-                <p class="muted">Latest matching events with actor, module, action, target, and summary.</p>
             </div>
             <span class="badge badge-blue">{{ count($logs) }} shown</span>
         </div>
@@ -105,7 +102,6 @@
         <div class="section-heading">
             <div>
                 <h2>Audit Detail Review</h2>
-                <p class="muted">Expanded event details to help explain what changed and who performed the action.</p>
             </div>
         </div>
 

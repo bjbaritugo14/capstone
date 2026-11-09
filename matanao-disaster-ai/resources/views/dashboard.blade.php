@@ -13,7 +13,6 @@
 <div class="page-header">
     <div>
         <h1>Incident Assessment Dashboard</h1>
-        <p class="muted">Monitor incidents, community impact, and response priorities across Matanao.</p>
     </div>
     <div class="header-actions">
         <a href="{{ route('reports.index') }}" class="btn btn-primary"><x-icon name="database" />Open Field Records</a>
@@ -22,19 +21,19 @@
 
 <div class="stats-grid">
     <div class="stat-card overview-stat">
-        <div><span>Web Submissions</span><strong>{{ number_format($stats['web_submissions']) }}</strong><small>Total disaster reports</small></div>
+        <div><span>Web Submissions</span><strong>{{ number_format($stats['web_submissions']) }}</strong></div>
         <div class="stat-icon"><x-icon name="database" /></div>
     </div>
     <div class="stat-card overview-stat">
-        <div><span>Validated</span><strong>{{ number_format($stats['validated_reports']) }}</strong><small>Verified disaster reports</small></div>
+        <div><span>Validated</span><strong>{{ number_format($stats['validated_reports']) }}</strong></div>
         <div class="stat-icon green"><x-icon name="clipboard-check" /></div>
     </div>
     <div class="stat-card overview-stat">
-        <div><span>Affected Households</span><strong>{{ number_format($stats['affected_households']) }}</strong><small>Across reported incidents</small></div>
+        <div><span>Affected Households</span><strong>{{ number_format($stats['affected_households']) }}</strong></div>
         <div class="stat-icon purple"><x-icon name="users" /></div>
     </div>
     <div class="stat-card overview-stat">
-        <div><span>Accident Logs</span><strong>{{ number_format($stats['accident_logs']) }}</strong><small>Total vehicular incidents</small></div>
+        <div><span>Accident Logs</span><strong>{{ number_format($stats['accident_logs']) }}</strong></div>
         <div class="stat-icon amber"><x-icon name="car" /></div>
     </div>
 </div>
@@ -44,9 +43,7 @@
         <div class="section-heading">
             <div>
                 <h2>Matanao GIS Incident Map</h2>
-                <p class="muted">Geographic overview of reported incidents</p>
             </div>
-            <span class="badge badge-blue">Incident locations</span>
         </div>
         <div class="map-shell">
             <div id="matanao-map" class="map-canvas" aria-label="Map of Matanao"></div>
@@ -63,7 +60,6 @@
             <div>
                 <h2>Relief Recommendations by Barangay</h2>
             </div>
-            <span class="badge badge-green">Decision Tree</span>
         </div>
 
         <div class="stack-list">
@@ -87,7 +83,7 @@
     </section>
 </div>
 
-<div class="content-grid two-columns bottom-gap">
+<div class="content-grid bottom-gap">
     <section class="card">
         <div class="section-heading">
             <div>
@@ -144,7 +140,7 @@
     </section>
 </div>
 
-<div class="content-grid two-columns bottom-gap">
+<div class="content-grid bottom-gap">
     <section class="card">
         <div class="section-heading">
             <div>
@@ -163,22 +159,6 @@
             @empty
                 <p class="empty-state">No accident hotspots recorded yet.</p>
             @endforelse
-        </div>
-    </section>
-
-    <section class="card">
-        <div class="section-heading">
-            <div>
-                <h2>Submission-to-Validation Flow</h2>
-            </div>
-        </div>
-        <div class="timeline-list">
-            @foreach($workflow as $step)
-                <div class="timeline-item">
-                    <span>{{ $loop->iteration }}</span>
-                    <p>{{ $step }}</p>
-                </div>
-            @endforeach
         </div>
     </section>
 </div>

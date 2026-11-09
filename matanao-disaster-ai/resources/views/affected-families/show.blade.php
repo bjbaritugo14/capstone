@@ -3,15 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Affected Family Registry</div>
         <h1>{{ $selectedBarangayGroup['barangay']->barangay_name }}</h1>
-        <p class="muted">
-            @if($isValidatedOnlyView)
-                Validated affected family data for this barangay.
-            @else
-                Reported affected family data for this barangay.
-            @endif
-        </p>
     </div>
     <div class="header-actions">
         <a href="{{ route('affected-families.index', array_filter(['name' => $name])) }}" class="btn btn-secondary">Back to Barangays</a>
@@ -118,7 +110,6 @@
                             <div class="section-heading compact-heading">
                                 <div>
                                     <h2>Family Photos</h2>
-                                    <p class="muted">Uploaded photos grouped under each affected family.</p>
                                 </div>
                             </div>
                             <div class="stack-list">
@@ -145,7 +136,6 @@
                         <div class="section-heading compact-heading">
                             <div>
                                 <h2>Report Photos</h2>
-                                <p class="muted">General photos attached to this disaster report.</p>
                             </div>
                         </div>
                         <div class="report-image-grid">

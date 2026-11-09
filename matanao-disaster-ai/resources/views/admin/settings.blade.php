@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Admin Oversight</div>
         <h1>System Settings</h1>
-        <p class="muted">Manage recommendation rules, impact thresholds, Ollama assistance, and active barangay options used by the web and mobile workflows.</p>
     </div>
 </div>
 
@@ -41,9 +39,7 @@
         <a href="{{ route('admin.settings.recommendations') }}" class="barangay-selector-card">
             <div>
                 <strong>Recommendation Configuration</strong>
-                <p>Open the full settings page for Decision Tree thresholds, assistance values, and Ollama options.</p>
             </div>
-            <span class="badge badge-blue">Open</span>
         </a>
     </section>
 
@@ -51,9 +47,7 @@
         <a href="{{ route('admin.settings.barangays.create') }}" class="barangay-selector-card">
             <div>
                 <strong>Add Barangay Option</strong>
-                <p>Create a new barangay on a separate page before it becomes available for web and mobile reporting.</p>
             </div>
-            <span class="badge badge-green">New</span>
         </a>
     </section>
 </div>
@@ -62,7 +56,6 @@
     <div class="section-heading">
         <div>
             <h2>Barangay Management</h2>
-            <p class="muted">Click a barangay to open a separate page before its edit form appears.</p>
         </div>
         <span class="badge badge-blue">{{ $barangays->count() }} barangays</span>
     </div>

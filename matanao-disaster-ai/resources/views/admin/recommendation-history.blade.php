@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Admin Oversight</div>
         <h1>Recommendation History</h1>
-        <p class="muted">View all Decision Tree-based recommendations, track triggered rules, and review past decision-support outputs.</p>
     </div>
 </div>
 
@@ -33,7 +31,6 @@
         <div class="section-heading">
             <div>
                 <h2>Generated Recommendation Outputs</h2>
-                <p class="muted">Audit view of all recommendation outputs generated for validated disaster reports.</p>
             </div>
         </div>
 
@@ -79,7 +76,6 @@
         <div class="section-heading">
             <div>
                 <h2>Triggered Rule Reference</h2>
-                <p class="muted">Decision Tree rules used as the primary basis for recommendation generation, with optional Ollama-assisted refinement.</p>
             </div>
         </div>
 
@@ -88,7 +84,6 @@
                 <div class="stack-item">
                     <div class="stack-head">
                         <strong>Rule {{ $rule['id'] }}</strong>
-                        <span class="badge badge-blue">Decision Tree</span>
                     </div>
                     <p><strong>Condition:</strong> {{ $rule['condition'] }}</p>
                     <p class="item-note"><strong>Logic:</strong> {{ $rule['logic'] }}</p>
@@ -103,7 +98,6 @@
     <div class="section-heading">
         <div>
             <h2>Decision-Support History Review</h2>
-            <p class="muted">Past outputs with report context, triggered rule summary, and generation details for audit and review.</p>
         </div>
     </div>
 

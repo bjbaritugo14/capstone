@@ -180,11 +180,7 @@
 
 <div class="page-header">
     <div>
-        <div class="pill">Field Officer Web Reporting</div>
         <h1>Field Officer Browser Reports</h1>
-    </div>
-    <div class="header-actions">
-        <span class="badge badge-blue">Expo-style workflow</span>
     </div>
 </div>
 
@@ -222,13 +218,12 @@
     </div>
 </div>
 
-<div class="content-grid two-columns">
+<div class="content-grid">
     <section class="card">
         <div class="section-heading">
             <div>
                 <h2>Recent Geotagged Submissions</h2>
             </div>
-            <span class="badge badge-blue">Leaflet</span>
         </div>
 
         <div class="map-shell">
@@ -239,19 +234,6 @@
             <span><i class="map-severity-dot low"></i><span class="badge badge-green">Low</span></span>
             <span><i class="map-severity-dot medium"></i><span class="badge badge-amber">Medium</span></span>
             <span><i class="map-severity-dot high"></i><span class="badge badge-red">High</span></span>
-        </div>
-    </section>
-
-    <section class="card">
-        <div class="section-heading">
-            <div>
-                <h2>Browser Intake Forms</h2>
-            </div>
-        </div>
-
-        <div class="mini-grid">
-            <div><span>Disaster Intake</span><strong>Affected families</strong></div>
-            <div><span>Accident Intake</span><strong>Road incidents</strong></div>
         </div>
     </section>
 </div>

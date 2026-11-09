@@ -14,16 +14,11 @@
                 <div class="brand-mark auth-brand-mark">M</div>
                 <div>
                     <strong>Matanao MDRRMO</strong>
-                    <span>Disaster response operations</span>
                 </div>
             </div>
 
             <div>
-                <div class="pill auth-pill">Command Center</div>
                 <h1>Disaster Damage Assessment and Incident Monitoring System</h1>
-                <p class="muted">
-                    Secure access for monitoring reports, validation activity, GIS records, and assistance recommendations.
-                </p>
             </div>
 
             <div class="auth-preview" aria-hidden="true">
@@ -43,21 +38,6 @@
                     <span></span>
                 </div>
             </div>
-
-            <div class="auth-feature-list">
-                <div class="feature-card">
-                    <strong>Field Reports</strong>
-                    <p>Geotagged disaster and accident records with field validation support.</p>
-                </div>
-                <div class="feature-card">
-                    <strong>GIS Monitoring</strong>
-                    <p>Barangay-level map views for incidents, impact areas, and response tracking.</p>
-                </div>
-                <div class="feature-card">
-                    <strong>Decision Support</strong>
-                    <p>Assistance recommendations based on validated impact and household data.</p>
-                </div>
-            </div>
         </div>
 
         <div class="card auth-card">
@@ -67,9 +47,7 @@
                 </div>
                 <div>
                     <h2>Authorized Login</h2>
-                    <p class="muted">Sign in with an active account from the database.</p>
                 </div>
-                <span class="badge badge-blue">Secure Access</span>
             </div>
 
             <form method="POST" action="{{ route('login.store', [], false) }}" class="form-grid auth-login-form" data-csrf-url="{{ route('login.csrf-token', [], false) }}">
@@ -102,20 +80,6 @@
                 </div>
             </form>
 
-            <div class="auth-role-notes">
-                <div>
-                    <span>MDRRMO</span>
-                    <strong>Dashboard, records, recommendations, accidents, and validation</strong>
-                </div>
-                <div>
-                    <span>Validator</span>
-                    <strong>Browser-based disaster and accident reporting when Expo is unavailable</strong>
-                </div>
-                <div>
-                    <span>Super Admin</span>
-                    <strong>User roles, barangay options, and system settings</strong>
-                </div>
-            </div>
         </div>
     </section>
     <script>

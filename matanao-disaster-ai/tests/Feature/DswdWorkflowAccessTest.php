@@ -40,7 +40,7 @@ class DswdWorkflowAccessTest extends TestCase
         $indexResponse
             ->assertOk()
             ->assertSessionHas('role', 'dswd')
-            ->assertSee('review only MDRRMO-validated family data for DSWD coordination')
+            ->assertSee('Affected Families Per Barangay')
             ->assertSee('Asbang')
             ->assertDontSee('Saub');
 
@@ -51,7 +51,7 @@ class DswdWorkflowAccessTest extends TestCase
 
         $showResponse
             ->assertOk()
-            ->assertSee('Validated affected family data for this barangay.')
+            ->assertSee($validatedBarangay->barangay_name)
             ->assertSee('Juan Dela Cruz')
             ->assertDontSee('Maria Santos')
             ->assertDontSee('Delete');
@@ -118,7 +118,7 @@ class DswdWorkflowAccessTest extends TestCase
         $response
             ->assertOk()
             ->assertSessionHas('role', 'dswd')
-            ->assertSee('validated-only list for relief planning')
+            ->assertSee('Recommendation Records')
             ->assertSee('Asbang')
             ->assertSee('Validation Officer')
             ->assertDontSee('Saub')

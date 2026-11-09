@@ -12,7 +12,6 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">MDRRMO Disaster Damage Module</div>
         <h1>Matanao Disaster Damage Map</h1>
     </div>
     <div class="header-actions">
@@ -49,7 +48,6 @@
             <div>
                 <h2>Geotagged Damage Reports</h2>
             </div>
-            <span class="badge badge-blue">Leaflet</span>
         </div>
         <div class="map-shell">
             <div id="damage-map" class="map-canvas" aria-label="Disaster damage map"></div>

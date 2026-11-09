@@ -77,7 +77,6 @@
             <kbd>/</kbd>
         </div>
         <div class="topbar-actions">
-            <span class="workspace-label"><span></span>{{ $roleLabel }} workspace</span>
             <details class="account-menu">
                 <summary aria-label="User account menu"><span class="avatar">{{ $initials }}</span><x-icon name="chevron-down" /></summary>
                 <div class="account-dropdown">
@@ -95,11 +94,6 @@
         <aside class="sidebar" id="app-sidebar" aria-label="Primary navigation">
             <div class="sidebar-inner">
                 <div class="sidebar-top">
-                    <div class="sidebar-workspace">
-                        <span class="workspace-icon"><x-icon name="layout-dashboard" /></span>
-                        <div><strong>Command Center</strong><span>Disaster & incident monitoring</span></div>
-                    </div>
-                    <div class="nav-section-label">Workspace</div>
                     <nav class="nav-links" id="primary-navigation" aria-label="Workspace pages">
                         @foreach ($navigation as $item)
                             <a
@@ -152,7 +146,7 @@
             @endif
 
             @yield('content')
-            <footer class="app-footer"><span>&copy; {{ now()->year }} Matanao MDRRMO</span><span>Damage assessment & incident monitoring</span></footer>
+            <footer class="app-footer"><span>&copy; {{ now()->year }} Matanao MDRRMO</span></footer>
         </main>
     </div>
     <script>

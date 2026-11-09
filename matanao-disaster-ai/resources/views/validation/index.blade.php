@@ -3,9 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">MDRRMO Review</div>
         <h1>Validation Queue</h1>
-        <p class="muted">Review all data submitted from mobile. Validate or return reports with a reason.</p>
     </div>
 </div>
 
@@ -32,7 +30,6 @@
     <div class="section-heading">
         <div>
             <h2>Pending Submissions</h2>
-            <p class="muted">Click on a record to view all submitted data and take action.</p>
         </div>
     </div>
 

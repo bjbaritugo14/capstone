@@ -3,15 +3,7 @@
 @section('content')
 <div class="page-header">
     <div>
-        <div class="pill">Affected Family Registry</div>
         <h1>Affected Families Per Barangay</h1>
-        <p class="muted">
-            @if($isValidatedOnlyView)
-                Click a barangay to review only MDRRMO-validated family data for DSWD coordination.
-            @else
-                Click a barangay to open a separate page with its reported family data.
-            @endif
-        </p>
     </div>
 </div>
 
@@ -36,13 +28,6 @@
     <div class="section-heading">
         <div>
             <h2>Barangays</h2>
-            <p class="muted">
-                @if($isValidatedOnlyView)
-                    Each click opens a validated-only barangay page for DSWD review.
-                @else
-                    Each click opens a new page for that barangay.
-                @endif
-            </p>
         </div>
         <span class="badge badge-blue">{{ $barangaySummaries->count() }} listed</span>
     </div>

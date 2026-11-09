@@ -31,7 +31,8 @@ class AffectedFamilyIndexTest extends TestCase
             ->assertOk()
             ->assertSee($firstBarangay->barangay_name)
             ->assertSee($secondBarangay->barangay_name)
-            ->assertSee('Each click opens a new page for that barangay.')
+            ->assertSee(route('affected-families.show', ['barangay' => $firstBarangay->barangay_id]))
+            ->assertSee(route('affected-families.show', ['barangay' => $secondBarangay->barangay_id]))
             ->assertDontSee('Juan Dela Cruz')
             ->assertDontSee('Maria Santos');
     }
