@@ -88,7 +88,9 @@
 
             <div class="mini-grid" style="margin-top: 12px;">
                 <div><span>Sitio/Purok</span><strong>{{ $record['sitio_purok'] }}</strong></div>
-                <div><span>Road Segment</span><strong>{{ $record['road_segment'] }}</strong></div>
+                @if($record['type'] === 'accident')
+                    <div><span>Road Segment</span><strong>{{ $record['road_segment'] }}</strong></div>
+                @endif
                 <div><span>{{ $record['type'] === 'report' ? 'Affected Structures' : 'Vehicles Involved' }}</span><strong>{{ $record['structures'] }}</strong></div>
             </div>
 

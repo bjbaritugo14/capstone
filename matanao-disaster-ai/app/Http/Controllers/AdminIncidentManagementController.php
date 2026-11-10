@@ -55,7 +55,6 @@ class AdminIncidentManagementController extends Controller
                     'status' => ucfirst($report->status),
                     'submitted_by' => $report->user?->full_name ?? 'Unknown user',
                     'incident_datetime' => $report->incident_datetime,
-                    'road_segment' => $report->location?->road_segment ?? 'N/A',
                     'sitio_purok' => $report->location?->sitio_purok ?? 'N/A',
                     'families' => $report->affectedFamilyRecords->count() ?: $report->affected_families,
                     'structures' => $report->affected_structures,

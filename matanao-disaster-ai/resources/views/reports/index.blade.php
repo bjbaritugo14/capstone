@@ -148,7 +148,6 @@
                     <th>Time</th>
                     <th>Barangay</th>
                     <th>Sitio/Purok</th>
-                    <th>Road Segment</th>
                     <th>Disaster Type</th>
                     <th>Severity</th>
                     <th>Families</th>
@@ -165,7 +164,6 @@
                         <td>{{ $report['time'] }}</td>
                         <td>{{ $report['barangay'] }}</td>
                         <td>{{ $report['sitio_purok'] }}</td>
-                        <td>{{ $report['road_segment'] }}</td>
                         <td>{{ $report['type'] }}</td>
                         <td>{{ $report['severity'] }}</td>
                         <td>{{ $report['families'] }}</td>
@@ -175,7 +173,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="12">No disaster damage records found.</td>
+                        <td colspan="11">No disaster damage records found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -248,7 +246,6 @@
             </div>`
             : `<strong class="map-popup-title">${point.id} | ${point.type}</strong>
             <div class="map-popup-line">${point.barangay}</div>
-            <div class="map-popup-line">${point.road_segment}</div>
             <div class="map-popup-line">${point.families} families | ${point.structures} structures</div>
             <div class="map-popup-badges">
                 <span class="badge ${style.badge}">${point.severity}</span>
