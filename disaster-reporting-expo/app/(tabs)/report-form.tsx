@@ -106,7 +106,7 @@ function normalizeFamilyName(family: AffectedFamily): AffectedFamily {
 
 export default function ReportFormScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; newEntry?: string }>();
   const reportId = params.id ? Number(params.id) : undefined;
   const { token } = useAuth();
   const { getReportById, createReport, updateReport } = useReports();
@@ -131,7 +131,7 @@ export default function ReportFormScreen() {
     } else {
       setForm(buildEmptyForm());
     }
-  }, [existingReport, reportId]);
+  }, [existingReport, reportId, params.newEntry]);
 
   useEffect(() => {
     let cancelled = false;

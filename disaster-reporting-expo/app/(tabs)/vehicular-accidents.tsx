@@ -82,7 +82,10 @@ export default function VehicularAccidentsScreen() {
                 value={search}
                 onChangeText={setSearch}
               />
-              <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(tabs)/accident-form')}>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => router.push({ pathname: '/(tabs)/accident-form', params: { id: '', newEntry: String(Date.now()) } })}
+              >
                 <Text style={styles.addButtonText}>New</Text>
               </TouchableOpacity>
             </View>

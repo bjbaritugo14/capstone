@@ -84,7 +84,7 @@ export default function DashboardScreen() {
               />
               <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => router.push({ pathname: '/(tabs)/report-form', params: { id: '' } })}
+                onPress={() => router.push({ pathname: '/(tabs)/report-form', params: { id: '', newEntry: String(Date.now()) } })}
               >
                 <Text style={styles.addButtonText}>New</Text>
               </TouchableOpacity>

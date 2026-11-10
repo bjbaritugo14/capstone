@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function TabsLayout() {
+  const router = useRouter();
   const { isAuthenticated, user } = useAuth();
 
   if (!isAuthenticated || user?.role !== 'field_officer') {
@@ -26,6 +27,15 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="report-form"
+        listeners={{
+          tabPress: (event) => {
+            event.preventDefault();
+            router.navigate({
+              pathname: '/(tabs)/report-form',
+              params: { id: '', newEntry: String(Date.now()) },
+            });
+          },
+        }}
         options={{
           title: 'New Disaster',
           tabBarIcon: ({ color, size }) => <Ionicons name="create-outline" color={color} size={size} />,

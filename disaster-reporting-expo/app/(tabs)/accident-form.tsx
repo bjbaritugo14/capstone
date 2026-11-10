@@ -21,6 +21,30 @@ import { useVehicularAccidents } from '../../src/context/VehicularAccidentContex
 import { api } from '../../src/services/api';
 import { InvolvedPerson, MATANAO_BARANGAYS, VehicularAccidentPayload } from '../../src/types';
 
+const ROAD_SEGMENTS = ['National Highway', 'Provincial Road', 'Municipal Road', 'Barangay Road', 'Intersection', 'Bridge', 'Other'];
+const ACCIDENT_TYPES = ['Collision', 'Hit and Run', 'Self Accident', 'Rollover', 'Vehicle Overturned', 'Pedestrian Hit', 'Vehicle Hit Fixed Object', 'Other'];
+const VEHICLE_TYPES = ['Motorcycle', 'Tricycle', 'Car', 'SUV', 'Van', 'Pickup Truck', 'Truck', 'Bus', 'Jeepney', 'Bicycle', 'Multicab', 'Other'];
+
+function ChoiceField({ label, value, options, onValueChange }: {
+  label: string;
+  value: string;
+  options: string[];
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.pickerWrapper}>
+        <Picker accessibilityLabel={label} selectedValue={value} onValueChange={onValueChange}>
+          <Picker.Item label={`Select ${label.toLowerCase()}`} value="" />
+          {value && !options.includes(value) ? <Picker.Item label={value} value={value} /> : null}
+          {options.map((option) => <Picker.Item key={option} label={option} value={option} />)}
+        </Picker>
+      </View>
+    </>
+  );
+}
+
 function hasValidCoordinates(latitude?: string, longitude?: string) {
   if (!latitude || !longitude) {
     return false;
@@ -123,7 +147,7 @@ function normalizeAccidentNames(payload: VehicularAccidentPayload): VehicularAcc
 
 export default function AccidentFormScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; newEntry?: string }>();
   const accidentId = params.id ? Number(params.id) : undefined;
   const { token } = useAuth();
   const { getAccidentById, createAccident, updateAccident } = useVehicularAccidents();
@@ -136,6 +160,18 @@ export default function AccidentFormScreen() {
   const [form, setForm] = useState<VehicularAccidentPayload>(buildEmptyForm());
   const [barangayOptions, setBarangayOptions] = useState<string[]>([...MATANAO_BARANGAYS]);
   const [submitting, setSubmitting] = useState(false);
+  const selectedVehicleTypes = form.vehicleType.split(',').map((value) => value.trim()).filter(Boolean);
+  const vehicleTypeOptions = [...new Set([...VEHICLE_TYPES, ...selectedVehicleTypes])];
+
+  const toggleVehicleType = (vehicleType: string) => {
+    setForm((current) => {
+      const selected = current.vehicleType.split(',').map((value) => value.trim()).filter(Boolean);
+      const updated = selected.includes(vehicleType)
+        ? selected.filter((value) => value !== vehicleType)
+        : [...selected, vehicleType];
+      return { ...current, vehicleType: updated.join(', ') };
+    });
+  };
 
   useEffect(() => {
     if (existingAccident) {
@@ -144,7 +180,7 @@ export default function AccidentFormScreen() {
     } else {
       setForm(buildEmptyForm());
     }
-  }, [existingAccident, accidentId]);
+  }, [existingAccident, accidentId, params.newEntry]);
 
   useEffect(() => {
     let cancelled = false;
@@ -264,6 +300,8 @@ export default function AccidentFormScreen() {
       } else {
         await createAccident(submissionForm);
       }
+      setForm(buildEmptyForm());
+      router.setParams({ id: '' });
       Alert.alert('Success', existingAccident ? 'Accident report updated and sent back for review.' : 'Accident report submitted.');
       router.replace('/(tabs)/vehicular-accidents');
     } catch (error) {
@@ -294,22 +332,40 @@ export default function AccidentFormScreen() {
             ))}
           </Picker>
         </View>
-        <TextInput style={styles.input} placeholder="Purok / Sitio" value={form.purok} onChangeText={(value) => setField('purok', value)} />
-        <TextInput style={styles.input} placeholder="Road segment (e.g. National Highway, Barangay Road)" value={form.roadSegment} onChangeText={(value) => setField('roadSegment', value)} />
+        <ChoiceField
+          label="Road segment"
+          value={form.roadSegment}
+          options={ROAD_SEGMENTS}
+          onValueChange={(value) => setField('roadSegment', value)}
+        />
 
         <Text style={styles.sectionTitle}>Vehicular accident details</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Accident type (e.g. Collision, Hit and Run)"
+        <ChoiceField
+          label="Accident type"
           value={form.accidentType}
-          onChangeText={(value) => setField('accidentType', value)}
+          options={ACCIDENT_TYPES}
+          onValueChange={(value) => setField('accidentType', value)}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Vehicle type (e.g. Motorcycle, Truck, Car)"
-          value={form.vehicleType}
-          onChangeText={(value) => setField('vehicleType', value)}
-        />
+        <Text style={styles.fieldLabel}>Vehicle types</Text>
+        <Text style={styles.mutedText}>Select all vehicle types involved. Tap again to remove a selection.</Text>
+        <View style={styles.vehicleTypeOptions}>
+          {vehicleTypeOptions.map((vehicleType) => {
+            const selected = selectedVehicleTypes.includes(vehicleType);
+            return (
+              <TouchableOpacity
+                key={vehicleType}
+                accessibilityRole="checkbox"
+                accessibilityLabel={vehicleType}
+                accessibilityState={{ checked: selected }}
+                style={[styles.vehicleTypeOption, selected && styles.vehicleTypeOptionSelected]}
+                onPress={() => toggleVehicleType(vehicleType)}
+              >
+                <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={20} color={selected ? '#0f766e' : '#6b7280'} />
+                <Text style={[styles.vehicleTypeText, selected && styles.vehicleTypeTextSelected]}>{vehicleType}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
         <TextInput
           style={[styles.input, styles.textArea]}
           multiline
@@ -522,6 +578,35 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
+  },
+  vehicleTypeOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  vehicleTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+  },
+  vehicleTypeOptionSelected: {
+    borderColor: '#0f766e',
+    backgroundColor: '#ecfdf5',
+  },
+  vehicleTypeText: {
+    color: '#374151',
+  },
+  vehicleTypeTextSelected: {
+    color: '#0f766e',
+    fontWeight: '700',
   },
   gpsRow: {
     flexDirection: 'row',
