@@ -25,4 +25,9 @@ class ReportImage extends Model
     {
         return $this->belongsTo(DamageReport::class, 'report_id', 'report_id');
     }
+
+    public function getUrlAttribute(): string
+    {
+        return \App\Support\EvidenceImage::url($this->image_path);
+    }
 }

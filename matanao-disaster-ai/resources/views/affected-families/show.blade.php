@@ -119,8 +119,8 @@
                                             <strong>{{ $family->family_head_name }}</strong>
                                             <div class="report-image-grid top-gap">
                                                 @foreach($family->images as $image)
-                                                    <a href="{{ asset('storage/'.$image->image_path) }}" target="_blank" class="report-image-link">
-                                                        <img src="{{ asset('storage/'.$image->image_path) }}" alt="{{ $family->family_head_name }} photo {{ $loop->iteration }}" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 180px;">
+                                                    <a href="{{ $image->url }}" target="_blank" class="report-image-link">
+                                                        <img src="{{ $image->url }}" alt="{{ $family->family_head_name }} photo {{ $loop->iteration }}" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 180px;">
                                                         <small>{{ $image->image_path }}</small>
                                                     </a>
                                                 @endforeach
@@ -140,8 +140,8 @@
                         </div>
                         <div class="report-image-grid">
                             @forelse($report->images->whereNull('family_id') as $image)
-                                <a href="{{ asset('storage/'.$image->image_path) }}" target="_blank" class="report-image-link">
-                                    <img src="{{ asset('storage/'.$image->image_path) }}" alt="Report photo {{ $loop->iteration }}" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 180px;">
+                                <a href="{{ $image->url }}" target="_blank" class="report-image-link">
+                                    <img src="{{ $image->url }}" alt="Report photo {{ $loop->iteration }}" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 180px;">
                                     <small>{{ $image->image_path }}</small>
                                 </a>
                             @empty

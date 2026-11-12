@@ -105,18 +105,6 @@ class DecisionTreeRecommendationService
         ];
     }
 
-    public function defenseExplanation(): array
-    {
-        return [
-            'Decision Tree is the main recommendation algorithm.',
-            'Ollama is not trained from scratch; it receives structured disaster data and returns JSON.',
-            'If Ollama is unavailable, the Decision Tree still generates food packs, cash assistance, and medicine kits only when medical-need terms are present.',
-            'Inputs are affected-family severity counts, effective severity, affected families, household members, affected structures, disaster type, barangay, and description; all are stored with the generated result.',
-            'Outputs are food packs, medicine kits, cash assistance, and recommendation basis; food packs use the fixed household-size rule and medicine kits are zero unless medical-need descriptions are detected.',
-            'Medicine, cash, and priority thresholds can be managed by administrators in System Settings.',
-        ];
-    }
-
     protected function descriptionText(DamageReport $report): string
     {
         return collect([(string) $report->description])

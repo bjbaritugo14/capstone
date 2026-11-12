@@ -108,7 +108,7 @@
                 <div class="report-image-grid">
                     @foreach($accident->images as $image)
                         <div class="report-image-link">
-                            <img src="{{ asset('storage/'.$image->image_path) }}" alt="Accident photo {{ $loop->iteration }}" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 180px;">
+                            <img src="{{ $image->url }}" alt="Accident photo {{ $loop->iteration }}" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 180px;">
                         </div>
                     @endforeach
                 </div>

@@ -23,4 +23,9 @@ class AccidentImage extends Model
     {
         return $this->belongsTo(VehicularAccident::class, 'accident_id', 'accident_id');
     }
+
+    public function getUrlAttribute(): string
+    {
+        return \App\Support\EvidenceImage::url($this->image_path);
+    }
 }

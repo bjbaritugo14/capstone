@@ -417,7 +417,7 @@ class MobileVehicularAccidentController extends Controller
     {
         $storedPath = $this->storedImagePath($path);
 
-        return $storedPath === null ? '' : asset('storage/'.$storedPath);
+        return $storedPath === null ? '' : \App\Support\EvidenceImage::url($storedPath);
     }
 
     protected function storedImagePath(mixed $path): ?string

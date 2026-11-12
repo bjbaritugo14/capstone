@@ -1,141 +1,79 @@
 # Disaster Reporting Expo App
 
-A Field Officer disaster and vehicular-accident reporting app for the Matanao Laravel backend.
+The Field Officer app connects directly to Supabase Auth, PostgreSQL RPC, and
+private Storage over HTTPS. Laravel, a PC on the same Wi-Fi, and a local API
+server are no longer required. Internet access is required.
 
-## Included screens
+## Run with Expo Go
 
-- Login
-- Dashboard with record count, search, edit, and delete
-- Reporting form with address, damage details, photos, GPS, and date
-- Profile with change password
-- Field Officer-only authenticated access
-
-## Tech stack
-
-- Expo SDK 54
-- Expo Router
-- React Native + TypeScript
-- `expo-image-picker` for photos
-- `expo-location` for GPS
-- `@react-native-picker/picker` for dropdowns
-
-## 1) Install prerequisites
-
-Make sure you have Node.js LTS installed.
-
-## 2) Install dependencies
-
-```bash
+```powershell
 npm install
+npm start
 ```
 
-## 3) Configure mock or real Laravel API
+Scan the QR code using Expo Go. The Expo development server is needed only for
+development; an installed release APK contains its own bundle.
 
-Copy the example environment file:
+## Configuration
 
-```bash
-cp .env.example .env
+Copy `.env.example` to `.env` and set the project's public Supabase URL and anon
+key. Never put a database password, service-role key, or media bridge password
+in an `EXPO_PUBLIC_` variable. Restart Expo after changing the environment.
+
+## Build an installable Android APK
+
+Requires the Android SDK and JDK 17 or newer.
+
+```powershell
+npm run build:android
+# With all Gradle dependencies already cached:
+npm run build:android -- -Offline
 ```
 
-### Use offline mode
+Install `android/app/build/outputs/apk/release/app-release.apk` on the phone.
+It opens without Expo Go, Metro, or Laravel. The APK uses the development signing
+key for local installation. Changing the Supabase project requires rebuilding.
 
-Keep this value in `.env`:
+## Database setup and account migration
 
-```env
-EXPO_PUBLIC_USE_REAL_API=false
+The scripts below run from `C:/project`. They use the existing Laravel `.env`
+database connection, which stays outside the mobile bundle.
+
+```powershell
+node scripts/supabase-db.cjs supabase/migrations/202611120001_mobile_api.sql
+node scripts/supabase-db.cjs supabase/migrations/202611120002_media_bridge.sql
+node scripts/migrate-mobile-media.cjs
+node scripts/test-mobile-supabase.cjs
 ```
 
-### Use your Laravel API
+The first migration provisions existing Field Officer accounts in Supabase Auth
+with their current bcrypt password hashes. Newly created Field Officer accounts
+are provisioned automatically. Password changes synchronize between the mobile
+app and Laravel. Every RPC checks the account's current active status and role.
+Only the officer's own reports and accidents are accessible. Raw Laravel tables
+(including users, passwords, and Sanctum tokens) are not exposed through the
+public Data API.
 
-Change `.env` to:
+Report/location/family/person/photo-reference changes save atomically in
+PostgreSQL. New photos go to the private `mobile-evidence` bucket; the app uses
+temporary signed URLs for viewing. Photos are limited to 10 MB each.
 
-```env
-EXPO_PUBLIC_USE_REAL_API=true
-EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8000/api
-```
+The media migration copies available existing files from Laravel public storage
+without deleting the originals. It also provisions a server-only media identity
+with access restricted to this bucket, so authorized Laravel website pages can
+still display mobile photos. Its credentials are written only to Laravel's
+ignored `.env`; the APK contains only the public anon key. Clear Laravel's config
+cache after setting up that identity. Database and Storage remain hosted even
+when Laravel is stopped.
 
-Use your computer's LAN IP for a physical phone. `127.0.0.1` or `localhost` will only work from the same machine/emulator.
+Fourteen pre-existing image files were missing from this PC during migration.
+Restore those files to Laravel's `storage/app/public` folder and rerun
+`node scripts/migrate-mobile-media.cjs` to copy them to Supabase. The missing
+references have been preserved.
 
-## 4) Start the app
+The integration test creates disposable accounts and records in the configured
+Supabase project and cleans them up. It checks real Auth, ownership, validation,
+private uploads, password synchronization, and disabled-account access.
 
-```bash
-npx expo start
-```
-
-You can also run:
-
-```bash
-npm run android
-npm run ios
-npm run web
-```
-
-## 5) Open it
-
-- Android/iPhone with Expo Go: scan the QR code shown by `npx expo start`
-- Android emulator: press `a`
-- iOS simulator on macOS: press `i`
-- Web browser: press `w`
-
-## Laravel API routes expected by the app
-
-```php
-Route::post('/login', [AuthController::class, 'login']);
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/reports', [ReportController::class, 'index']);
-    Route::post('/reports', [ReportController::class, 'store']);
-    Route::put('/reports/{report}', [ReportController::class, 'update']);
-    Route::delete('/reports/{report}', [ReportController::class, 'destroy']);
-    Route::get('/vehicular-accidents', [VehicularAccidentController::class, 'index']);
-    Route::post('/vehicular-accidents', [VehicularAccidentController::class, 'store']);
-    Route::put('/vehicular-accidents/{accident}', [VehicularAccidentController::class, 'update']);
-    Route::delete('/vehicular-accidents/{accident}', [VehicularAccidentController::class, 'destroy']);
-    Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
-});
-```
-
-## Suggested Laravel JSON shapes
-
-### `POST /login`
-
-```json
-{
-  "token": "plain-text-token",
-  "user": {
-    "id": 1,
-    "name": "Bryan Barz",
-    "email": "bryan@example.com"
-  }
-}
-```
-
-### `GET /reports`
-
-```json
-[
-  {
-    "id": 1,
-    "province": "Cebu",
-    "city": "Cebu City",
-    "barangay": "Lahug",
-    "purok": "Purok 3",
-    "description": "Strong winds damaged several roofs.",
-    "disasterType": "Typhoon",
-    "severity": "severe",
-    "affectedFamilies": 12,
-    "affectedStructures": 8,
-    "photos": ["https://example.com/photo1.jpg"],
-    "longitude": "123.8854",
-    "latitude": "10.3157",
-    "reportDate": "2026-03-22",
-    "createdAt": "2026-03-22T08:00:00.000000Z"
-  }
-]
-```
-
-## Notes
-
-- In mock mode, login accepts any email and password.
-- In real API mode, only active `field_officer` accounts can use the mobile reporting screens.
-- Image upload currently stores local image URIs in the app. For Laravel production use, upload files as `multipart/form-data` and store returned URLs.
-- GPS uses the device's current foreground location permission.
+Legacy `start:full` scripts now start Expo only. The old Laravel setup document
+is historical and is not required for the direct Supabase app.

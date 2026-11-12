@@ -1,457 +1,121 @@
-import { mockApi } from '../mocks/mockApi';
+import { File } from 'expo-file-system';
+import { randomUUID } from 'expo-crypto';
+import { Platform } from 'react-native';
+import { supabase } from './supabase';
 import { BarangayOption, Report, ReportPayload, User, VehicularAccident, VehicularAccidentPayload } from '../types';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://192.168.1.50:8000/api';
-const USE_REAL_API = process.env.EXPO_PUBLIC_USE_REAL_API !== 'false';
-const USE_MOCK_API = !USE_REAL_API;
+const BUCKET = 'mobile-evidence';
+const PREFIX = `supabase://${BUCKET}/`;
 
-console.log(`[API] Using ${USE_MOCK_API ? 'mock API' : 'real API'} at:`, API_BASE_URL);
-
-async function request<T>(endpoint: string, options: RequestInit = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
-  console.log(`[API] ${options.method || 'GET'} ${url}`);
-  if (options.body) {
-    console.log('[API] Body:', options.body);
-  }
-
-  const { headers: optionHeaders, ...restOptions } = options;
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...restOptions,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...(optionHeaders || {}),
-      },
-    });
-  } catch (networkError) {
-    console.error('[API] Network error:', networkError);
-    throw new Error('Network error — cannot reach the server. Check your connection and API URL.');
-  }
-
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    console.error(`[API] ${response.status} Error:`, JSON.stringify(data, null, 2));
-    const validationErrors = data?.errors
-      ? Object.values(data.errors).flat().join('\n')
-      : '';
-    throw new Error(validationErrors || data?.message || `Request failed (${response.status}).`);
-  }
-
-  console.log('[API] Success:', response.status);
+async function rpc<T>(action: string, payload: unknown = {}, recordId?: number): Promise<T> {
+  const { data, error } = await supabase.rpc('mobile_api', { action, payload, record_id: recordId ?? null });
+  if (error) throw new Error(error.message);
   return data as T;
 }
 
+// Keep the storage reference on signed URLs; edits must not save an expiring URL.
+function storedPhoto(uri: string): string {
+  const marker = '#mobile-object=';
+  const index = uri.lastIndexOf(marker);
+  return index < 0 ? uri : decodeURIComponent(uri.slice(index + marker.length));
+}
+async function displayPhoto(reference: string): Promise<string> {
+  if (!reference.startsWith(PREFIX)) return reference;
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(reference.slice(PREFIX.length), 86400);
+  if (error) throw new Error(`Unable to load photo: ${error.message}`);
+  return `${data.signedUrl}#mobile-object=${encodeURIComponent(reference)}`;
+}
+async function displayRecord<T extends Report | VehicularAccident>(record: T): Promise<T> {
+  const result = { ...record, photos: await Promise.all(record.photos.map(displayPhoto)) };
+  if ('families' in result) result.families = await Promise.all(result.families.map(async family => ({
+    ...family, photos: await Promise.all(family.photos.map(displayPhoto)),
+  })));
+  return result;
+}
+
+async function saveWithPhotos<T extends Report | VehicularAccident>(
+  action: string, payload: ReportPayload | VehicularAccidentPayload, recordId?: number,
+): Promise<T> {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error('Please log in again.');
+  const uploaded: string[] = [];
+  const cache = new Map<string, Promise<string>>();
+  const upload = (uri: string): Promise<string> => {
+    if (cache.has(uri)) return cache.get(uri)!;
+    const promise = (async () => {
+      const reference = storedPhoto(uri);
+      if (reference.startsWith(PREFIX) || /^https?:\/\//.test(reference)) return reference;
+      const bytes = Platform.OS === 'web' ? await (await fetch(uri)).arrayBuffer() : await new File(uri).arrayBuffer();
+      if (bytes.byteLength > 10 * 1024 * 1024) throw new Error('Each photo must be 10 MB or smaller.');
+      const extension = uri.split('?')[0].split('.').pop()?.toLowerCase();
+      const ext = extension && ['jpg','jpeg','png','webp','heic','heif'].includes(extension) ? extension : 'jpg';
+      const path = `${user.id}/${randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` });
+      if (uploadError) throw new Error(`Photo upload failed: ${uploadError.message}`);
+      uploaded.push(path);
+      return PREFIX + path;
+    })();
+    cache.set(uri, promise);
+    return promise;
+  };
+  let saved: T;
+  try {
+    const photos: string[] = [];
+    for (const photo of payload.photos) photos.push(await upload(photo));
+    const prepared = { ...payload, photos };
+    if ('families' in prepared) {
+      const families = [];
+      for (const family of prepared.families) {
+        const familyPhotos = [];
+        for (const photo of family.photos) familyPhotos.push(await upload(photo));
+        families.push({ ...family, photos: familyPhotos });
+      }
+      prepared.families = families;
+    }
+    saved = await rpc<T>(action, prepared, recordId);
+  } catch (error) {
+    // A lost response can follow a committed save; preserve evidence in that case.
+    const message = error instanceof Error ? error.message : '';
+    if (uploaded.length && !/fetch|network|timeout|abort/i.test(message)) {
+      await supabase.storage.from(BUCKET).remove(uploaded).catch(() => undefined);
+    }
+    throw error;
+  }
+  return displayRecord(saved);
+}
+
 export const api = {
-  useMockApi: USE_MOCK_API,
-
+  useMockApi: false,
+  getProfile: () => rpc<User>('profile'),
   async login(email: string, password: string): Promise<{ token: string; user: User }> {
-    if (USE_MOCK_API) {
-      return mockApi.login(email, password);
-    }
-
-    return request('/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) throw new Error(error.message);
+    try { return { token: data.session.access_token, user: await rpc<User>('profile') }; }
+    catch (error) { await supabase.auth.signOut({ scope: 'local' }); throw error; }
   },
-
-  async logout(token?: string) {
-    if (USE_MOCK_API) {
-      return { message: 'Logged out.' };
-    }
-
-    return request('/logout', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  async logout(_token?: string) {
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) throw new Error(error.message);
   },
-
-  async getReports(token?: string): Promise<Report[]> {
-    if (USE_MOCK_API) {
-      return mockApi.getReports();
-    }
-
-    const data = await request<Report[] | { data: Report[] }>('/reports', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const list = Array.isArray(data) ? data : data.data ?? [];
-    return list.filter((item) => item && item.id != null);
+  async getReports(_token?: string): Promise<Report[]> {
+    return Promise.all((await rpc<Report[]>('reports')).map(displayRecord));
   },
-
-  async getBarangays(token?: string): Promise<BarangayOption[]> {
-    if (USE_MOCK_API) {
-      return [];
-    }
-
-    const data = await request<BarangayOption[] | { data: BarangayOption[] }>('/barangays', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const list = Array.isArray(data) ? data : data.data ?? [];
-    return list.filter((item) => item && item.id != null && item.name);
+  getBarangays: (_token?: string) => rpc<BarangayOption[]>('barangays'),
+  createReport: (payload: ReportPayload, _token?: string) => saveWithPhotos<Report>('save_report', payload),
+  updateReport: (id: number, payload: ReportPayload, _token?: string) => saveWithPhotos<Report>('save_report', payload, id),
+  async deleteReport(id: number, _token?: string) { await rpc('delete_report', {}, id); return true; },
+  async updatePassword(currentPassword: string, newPassword: string, _token?: string) {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user?.email) throw new Error('Please log in again.');
+    await this.login(user.email, currentPassword);
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) throw new Error(updateError.message);
+    return { message: 'Password updated.' };
   },
-
-  async createReport(payload: ReportPayload, token?: string): Promise<Report> {
-    if (USE_MOCK_API) {
-      return mockApi.createReport(payload);
-    }
-
-    console.log('[API] createReport called, token present:', !!token);
-
-    const formData = new FormData();
-    formData.append('barangay', payload.barangay);
-    formData.append('purok', payload.purok || '');
-    formData.append('description', payload.description);
-    formData.append('disasterType', payload.disasterType);
-    formData.append('severity', payload.severity);
-    formData.append('affectedStructures', String(payload.affectedStructures || 0));
-    formData.append('reportDate', payload.reportDate);
-
-    if (payload.latitude) formData.append('latitude', payload.latitude);
-    if (payload.longitude) formData.append('longitude', payload.longitude);
-
-    // Append families as JSON (without photos - photos sent as files)
-    const familiesForJson = (payload.families || []).map(({ photos, ...rest }) => rest);
-    formData.append('families', JSON.stringify(familiesForJson));
-
-    // Append per-family photos as actual files
-    (payload.families || []).forEach((family, familyIndex) => {
-      (family.photos || []).forEach((uri, photoIndex) => {
-        if (uri) {
-          const filename = uri.split('/').pop() || `family${familyIndex}_photo${photoIndex}.jpg`;
-          const match = /\.(\w+)$/.exec(filename);
-          const ext = match ? match[1] : 'jpg';
-          const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-
-          formData.append(`family_photos_${familyIndex}[]`, {
-            uri,
-            name: filename,
-            type: mimeType,
-          } as any);
-        }
-      });
-    });
-
-    // The form also aggregates family photos at the top level; upload each only once.
-    const familyPhotoUris = new Set((payload.families || []).flatMap((family) => family.photos || []));
-    (payload.photos || []).forEach((uri, index) => {
-      if (uri && !familyPhotoUris.has(uri)) {
-        const filename = uri.split('/').pop() || `photo_${index}.jpg`;
-        const match = /\.(\w+)$/.exec(filename);
-        const ext = match ? match[1] : 'jpg';
-        const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-
-        formData.append('photos[]', {
-          uri,
-          name: filename,
-          type: mimeType,
-        } as any);
-      }
-    });
-
-    const url = `${API_BASE_URL}/reports`;
-    console.log(`[API] POST ${url} (multipart/form-data)`);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      console.error(`[API] ${response.status} Error:`, JSON.stringify(data, null, 2));
-      const validationErrors = data?.errors
-        ? Object.values(data.errors).flat().join('\n')
-        : '';
-      throw new Error(validationErrors || data?.message || `Request failed (${response.status}).`);
-    }
-
-    console.log('[API] Success:', response.status);
-    return data as Report;
+  async getVehicularAccidents(_token?: string): Promise<VehicularAccident[]> {
+    return Promise.all((await rpc<VehicularAccident[]>('accidents')).map(displayRecord));
   },
-
-  async updateReport(id: number, payload: ReportPayload, token?: string): Promise<Report> {
-    if (USE_MOCK_API) {
-      return mockApi.updateReport(id, payload);
-    }
-
-    const formData = new FormData();
-    formData.append('barangay', payload.barangay);
-    formData.append('purok', payload.purok || '');
-    formData.append('description', payload.description);
-    formData.append('disasterType', payload.disasterType);
-    formData.append('severity', payload.severity);
-    formData.append('affectedStructures', String(payload.affectedStructures || 0));
-    formData.append('reportDate', payload.reportDate);
-
-    if (payload.latitude) formData.append('latitude', payload.latitude);
-    if (payload.longitude) formData.append('longitude', payload.longitude);
-
-    // Append families as JSON (without photos - photos sent as files)
-    const familiesForJson = (payload.families || []).map(({ photos, ...rest }) => rest);
-    formData.append('families', JSON.stringify(familiesForJson));
-
-    // Append per-family photos as actual files or existing paths
-    (payload.families || []).forEach((family, familyIndex) => {
-      (family.photos || []).forEach((uri, photoIndex) => {
-        if (uri && (uri.startsWith('file://') || uri.startsWith('content://'))) {
-          const filename = uri.split('/').pop() || `family${familyIndex}_photo${photoIndex}.jpg`;
-          const match = /\.(\w+)$/.exec(filename);
-          const ext = match ? match[1] : 'jpg';
-          const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-
-          formData.append(`family_photos_${familyIndex}[]`, {
-            uri,
-            name: filename,
-            type: mimeType,
-          } as any);
-        } else if (uri) {
-          formData.append(`existing_family_photos_${familyIndex}[]`, uri);
-        }
-      });
-    });
-
-    // Laravel doesn't support PUT with multipart, use POST with _method override
-    formData.append('_method', 'PUT');
-
-    const url = `${API_BASE_URL}/reports/${id}`;
-    console.log(`[API] POST ${url} (multipart/form-data, _method=PUT)`);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      console.error(`[API] ${response.status} Error:`, JSON.stringify(data, null, 2));
-      const validationErrors = data?.errors
-        ? Object.values(data.errors).flat().join('\n')
-        : '';
-      throw new Error(validationErrors || data?.message || `Request failed (${response.status}).`);
-    }
-
-    console.log('[API] Success:', response.status);
-    return data as Report;
-  },
-
-  async deleteReport(id: number, token?: string): Promise<boolean> {
-    if (USE_MOCK_API) {
-      return mockApi.deleteReport(id);
-    }
-
-    await request(`/reports/${id}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    return true;
-  },
-
-  async updatePassword(currentPassword: string, newPassword: string, token?: string) {
-    if (USE_MOCK_API) {
-      return mockApi.updatePassword(currentPassword, newPassword);
-    }
-
-    return request('/profile/password', {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        current_password: currentPassword,
-        password: newPassword,
-        password_confirmation: newPassword,
-      }),
-    });
-  },
-
-  async getVehicularAccidents(token?: string): Promise<VehicularAccident[]> {
-    if (USE_MOCK_API) {
-      return mockApi.getVehicularAccidents();
-    }
-
-    const data = await request<VehicularAccident[] | { data: VehicularAccident[] }>('/vehicular-accidents', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const list = Array.isArray(data) ? data : data.data ?? [];
-    return list.filter((item) => item && item.id != null);
-  },
-
-  async createVehicularAccident(payload: VehicularAccidentPayload, token?: string): Promise<VehicularAccident> {
-    if (USE_MOCK_API) {
-      return mockApi.createVehicularAccident(payload);
-    }
-
-    const formData = new FormData();
-    formData.append('barangay', payload.barangay);
-    formData.append('purok', payload.purok || '');
-    formData.append('roadSegment', payload.roadSegment || '');
-    formData.append('personFirstName', payload.personFirstName || '');
-    formData.append('personLastName', payload.personLastName || '');
-    formData.append('personName', payload.personName || '');
-    formData.append('accidentType', payload.accidentType);
-    formData.append('vehicleType', payload.vehicleType || '');
-    formData.append('description', payload.description);
-    formData.append('vehiclesInvolved', String(payload.vehiclesInvolved || 1));
-    formData.append('injuredCount', String(payload.injuredCount || 0));
-    formData.append('fatalityCount', String(payload.fatalityCount || 0));
-    formData.append('incidentDate', payload.incidentDate);
-    formData.append('involvedPersons', JSON.stringify(payload.involvedPersons || []));
-
-    if (payload.latitude) formData.append('latitude', payload.latitude);
-    if (payload.longitude) formData.append('longitude', payload.longitude);
-
-    // Append photos as actual files
-    (payload.photos || []).forEach((uri, index) => {
-      if (uri) {
-        const filename = uri.split('/').pop() || `accident_photo_${index}.jpg`;
-        const match = /\.(\w+)$/.exec(filename);
-        const ext = match ? match[1] : 'jpg';
-        const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-
-        formData.append('photos[]', {
-          uri,
-          name: filename,
-          type: mimeType,
-        } as any);
-      }
-    });
-
-    const url = `${API_BASE_URL}/vehicular-accidents`;
-    console.log(`[API] POST ${url} (multipart/form-data)`);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      console.error(`[API] ${response.status} Error:`, JSON.stringify(data, null, 2));
-      const validationErrors = data?.errors
-        ? Object.values(data.errors).flat().join('\n')
-        : '';
-      throw new Error(validationErrors || data?.message || `Request failed (${response.status}).`);
-    }
-
-    console.log('[API] Success:', response.status);
-    return data as VehicularAccident;
-  },
-
-  async updateVehicularAccident(id: number, payload: VehicularAccidentPayload, token?: string): Promise<VehicularAccident> {
-    if (USE_MOCK_API) {
-      return mockApi.updateVehicularAccident(id, payload);
-    }
-
-    const formData = new FormData();
-    formData.append('barangay', payload.barangay);
-    formData.append('purok', payload.purok || '');
-    formData.append('roadSegment', payload.roadSegment || '');
-    formData.append('personFirstName', payload.personFirstName || '');
-    formData.append('personLastName', payload.personLastName || '');
-    formData.append('personName', payload.personName || '');
-    formData.append('accidentType', payload.accidentType);
-    formData.append('vehicleType', payload.vehicleType || '');
-    formData.append('description', payload.description);
-    formData.append('vehiclesInvolved', String(payload.vehiclesInvolved || 1));
-    formData.append('injuredCount', String(payload.injuredCount || 0));
-    formData.append('fatalityCount', String(payload.fatalityCount || 0));
-    formData.append('incidentDate', payload.incidentDate);
-    formData.append('involvedPersons', JSON.stringify(payload.involvedPersons || []));
-
-    if (payload.latitude) formData.append('latitude', payload.latitude);
-    if (payload.longitude) formData.append('longitude', payload.longitude);
-
-    // Append photos
-    (payload.photos || []).forEach((uri, index) => {
-      if (uri && (uri.startsWith('file://') || uri.startsWith('content://'))) {
-        const filename = uri.split('/').pop() || `accident_photo_${index}.jpg`;
-        const match = /\.(\w+)$/.exec(filename);
-        const ext = match ? match[1] : 'jpg';
-        const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-
-        formData.append('photos[]', {
-          uri,
-          name: filename,
-          type: mimeType,
-        } as any);
-      } else if (uri) {
-        formData.append('existing_photos[]', uri);
-      }
-    });
-
-    formData.append('_method', 'PUT');
-
-    const url = `${API_BASE_URL}/vehicular-accidents/${id}`;
-    console.log(`[API] POST ${url} (multipart/form-data, _method=PUT)`);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      console.error(`[API] ${response.status} Error:`, JSON.stringify(data, null, 2));
-      const validationErrors = data?.errors
-        ? Object.values(data.errors).flat().join('\n')
-        : '';
-      throw new Error(validationErrors || data?.message || `Request failed (${response.status}).`);
-    }
-
-    console.log('[API] Success:', response.status);
-    return data as VehicularAccident;
-  },
-
-  async deleteVehicularAccident(id: number, token?: string): Promise<boolean> {
-    if (USE_MOCK_API) {
-      return mockApi.deleteVehicularAccident(id);
-    }
-
-    await request(`/vehicular-accidents/${id}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    return true;
-  },
+  createVehicularAccident: (payload: VehicularAccidentPayload, _token?: string) => saveWithPhotos<VehicularAccident>('save_accident', payload),
+  updateVehicularAccident: (id: number, payload: VehicularAccidentPayload, _token?: string) => saveWithPhotos<VehicularAccident>('save_accident', payload, id),
+  async deleteVehicularAccident(id: number, _token?: string) { await rpc('delete_accident', {}, id); return true; },
 };

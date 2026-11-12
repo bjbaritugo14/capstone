@@ -1,4 +1,6 @@
-import React, { createContext, PropsWithChildren, useContext, useMemo, useState } from 'react';
+import React, { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { supabase } from '../services/supabase';
 import { api } from '../services/api';
 import { User } from '../types';
 
@@ -15,12 +17,37 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [initializing, setInitializing] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (!session) { setToken(null); setUser(null); }
+      else if (event === 'TOKEN_REFRESHED') setToken(session.access_token);
+    });
+    void (async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (session) {
+          const profile = await api.getProfile();
+          if (active) { setUser(profile); setToken(session.access_token); }
+        }
+      } catch {
+        await supabase.auth.signOut({ scope: 'local' });
+      } finally {
+        if (active) setInitializing(false);
+      }
+    })();
+    return () => { active = false; subscription.unsubscribe(); };
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       token,
-      isAuthenticated: Boolean(token),
+      isAuthenticated: Boolean(token && user),
       login: async (email: string, password: string) => {
         const response = await api.login(email, password);
 
@@ -43,7 +70,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [token, user]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{initializing
+    ? <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator size="large" /></View>
+    : children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

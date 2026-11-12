@@ -92,7 +92,7 @@
                                     <div class="report-image-grid">
                                         @foreach($family->images as $image)
                                             <div class="report-image-link">
-                                                <img src="{{ asset('storage/'.$image->image_path) }}" alt="Family {{ $loop->parent->iteration }} photo" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 140px;">
+                                                <img src="{{ $image->url }}" alt="Family {{ $loop->parent->iteration }} photo" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 140px;">
                                             </div>
                                         @endforeach
                                     </div>
@@ -118,7 +118,7 @@
                 <div class="report-image-grid">
                     @foreach($report->images as $image)
                         <div class="report-image-link">
-                            <img src="{{ asset('storage/'.$image->image_path) }}" alt="Report photo {{ $loop->iteration }}" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 180px;">
+                            <img src="{{ $image->url }}" alt="Report photo {{ $loop->iteration }}" style="width: 100%; border-radius: 8px; object-fit: cover; max-height: 180px;">
                             <small>{{ $image->image_path }}</small>
                         </div>
                     @endforeach

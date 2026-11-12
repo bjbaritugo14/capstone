@@ -28,7 +28,6 @@ export function ReportProvider({ children }: PropsWithChildren) {
 
     setLoading(true);
     try {
-      console.log('[ReportContext] Fetching reports with token:', token ? token.substring(0, 20) + '...' : 'NONE');
       const data = await api.getReports(token || undefined);
       console.log('[ReportContext] Got reports:', data.length);
       setReports(Array.isArray(data) ? data : []);
