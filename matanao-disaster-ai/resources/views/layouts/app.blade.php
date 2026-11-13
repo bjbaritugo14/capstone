@@ -78,12 +78,21 @@
         </div>
         <div class="topbar-actions">
             <details class="account-menu">
-                <summary aria-label="User account menu"><span class="avatar">{{ $initials }}</span><x-icon name="chevron-down" /></summary>
+                <summary aria-label="User account menu">
+                    <span class="avatar">{{ $initials }}</span>
+                    <span class="topbar-user-name">{{ $userName }}</span>
+                    <x-icon name="chevron-down" />
+                </summary>
                 <div class="account-dropdown">
-                    <strong>{{ $userName }}</strong>
-                    <span>{{ auth()->user()?->email }}</span>
-                    <span class="account-role">{{ $roleLabel }}</span>
-                    <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit"><x-icon name="log-out" />Sign out</button></form>
+                    <div class="account-dropdown-user">
+                        <strong>{{ $userName }}</strong>
+                        <span class="account-dropdown-email">{{ auth()->user()?->email }}</span>
+                        <span class="account-dropdown-role">{{ $roleLabel }}</span>
+                    </div>
+                    <form method="POST" action="{{ route('logout') }}" class="account-dropdown-form">
+                        @csrf
+                        <button type="submit"><x-icon name="log-out" />Sign out</button>
+                    </form>
                 </div>
             </details>
         </div>
@@ -110,25 +119,6 @@
                         @endforeach
                     </nav>
                     <p class="navigation-empty" hidden>No matching pages.</p>
-                </div>
-
-                <div class="sidebar-footer">
-                    <div class="user-card">
-                        <div class="avatar">{{ $initials }}</div>
-                        <div>
-                            <strong>{{ $userName }}</strong>
-                            <p>{{ $roleLabel }}</p>
-                        </div>
-                    </div>
-                    <form method="POST" action="{{ route('logout') }}" class="logout-form">
-                        @csrf
-                        <button type="submit" class="logout-link">
-                            <span class="nav-icon" data-fallback="LO" aria-hidden="true">
-                                <x-icon name="log-out" />
-                            </span>
-                            <span class="nav-label">Logout</span>
-                        </button>
-                    </form>
                 </div>
             </div>
         </aside>
@@ -158,20 +148,36 @@
             const search = document.getElementById('navigation-search');
             const mobile = window.matchMedia('(max-width: 860px)');
 
-            const setSidebar = (isOpen) => {
-                body.classList.toggle('sidebar-open', isOpen);
-                toggle?.setAttribute('aria-expanded', String(isOpen));
-                toggle?.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
-                if (mobile.matches) sidebar.inert = !isOpen;
+            const toggleSidebar = () => {
+                if (mobile.matches) {
+                    const isOpen = !body.classList.contains('sidebar-open');
+                    body.classList.toggle('sidebar-open', isOpen);
+                    toggle?.setAttribute('aria-expanded', String(isOpen));
+                    toggle?.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
+                    sidebar.inert = !isOpen;
+                    if (isOpen) {
+                        sidebar.querySelector('a:not([hidden]), button')?.focus();
+                    }
+                } else {
+                    const isCollapsed = !body.classList.contains('sidebar-collapsed');
+                    body.classList.toggle('sidebar-collapsed', isCollapsed);
+                    toggle?.setAttribute('aria-expanded', String(!isCollapsed));
+                    toggle?.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+                }
             };
 
-            toggle?.addEventListener('click', () => {
-                setSidebar(!body.classList.contains('sidebar-open'));
-                if (mobile.matches && body.classList.contains('sidebar-open')) sidebar.querySelector('a:not([hidden]), button')?.focus();
-            });
+            toggle?.addEventListener('click', toggleSidebar);
 
             closeTargets.forEach((target) => {
-                target.addEventListener('click', () => { setSidebar(false); if (mobile.matches) toggle?.focus(); });
+                target.addEventListener('click', () => {
+                    if (mobile.matches) {
+                        body.classList.remove('sidebar-open');
+                        toggle?.setAttribute('aria-expanded', 'false');
+                        toggle?.setAttribute('aria-label', 'Open navigation');
+                        sidebar.inert = true;
+                        toggle?.focus();
+                    }
+                });
             });
 
             search?.addEventListener('input', () => {
@@ -180,18 +186,31 @@
                 links.forEach(link => { link.hidden = !link.textContent.toLowerCase().includes(query); });
                 document.querySelector('.navigation-empty').hidden = links.some(link => !link.hidden);
             });
-            mobile.addEventListener('change', () => { setSidebar(false); sidebar.inert = mobile.matches; });
-            sidebar.inert = mobile.matches;
+
+            const handleMediaChange = () => {
+                body.classList.remove('sidebar-open');
+                body.classList.remove('sidebar-collapsed');
+                sidebar.inert = mobile.matches;
+                toggle?.setAttribute('aria-expanded', mobile.matches ? 'false' : 'true');
+            };
+            mobile.addEventListener('change', handleMediaChange);
+            handleMediaChange();
+
             document.addEventListener('click', (event) => {
-                document.querySelectorAll('.account-menu[open]').forEach(menu => { if (!menu.contains(event.target)) menu.open = false; });
+                document.querySelectorAll('.account-menu[open]').forEach(menu => {
+                    if (!menu.contains(event.target)) menu.open = false;
+                });
             });
 
             window.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape') {
-                    const sidebarWasOpen = body.classList.contains('sidebar-open');
-                    setSidebar(false);
                     document.querySelectorAll('.account-menu[open]').forEach(menu => { menu.open = false; });
-                    if (mobile.matches && sidebarWasOpen) toggle?.focus();
+                    if (mobile.matches && body.classList.contains('sidebar-open')) {
+                        body.classList.remove('sidebar-open');
+                        toggle?.setAttribute('aria-expanded', 'false');
+                        sidebar.inert = true;
+                        toggle?.focus();
+                    }
                 }
                 if (event.key === '/' && !/input|textarea|select/i.test(document.activeElement.tagName) && !document.activeElement.isContentEditable) {
                     event.preventDefault();

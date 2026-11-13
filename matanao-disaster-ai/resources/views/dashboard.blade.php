@@ -244,5 +244,10 @@
 
     bounds.push([mapCenter.lat, mapCenter.lng]);
     map.fitBounds(bounds, { padding: [28, 28] });
+
+    if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('matanao-map'));
+    }
+    window.addEventListener('resize', () => map.invalidateSize());
 </script>
 @endsection

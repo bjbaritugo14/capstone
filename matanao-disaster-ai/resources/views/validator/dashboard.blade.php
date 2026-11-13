@@ -8,114 +8,29 @@
     crossorigin=""
 >
 <style>
-    .validator-note {
-        padding: 16px 18px;
-        border: 1px solid rgba(31, 95, 74, 0.18);
-        border-radius: 16px;
-        background: linear-gradient(135deg, rgba(242, 248, 245, 0.95), rgba(255, 251, 245, 0.98));
-        color: var(--muted);
-        line-height: 1.55;
+    .form-pane {
+        transition: opacity 0.2s ease;
     }
-
-    .validator-note strong {
-        color: var(--text);
+    .form-pane.is-hidden {
+        display: none !important;
     }
-
-    .validator-form-grid {
-        display: grid;
-        gap: 14px;
+    .forms-single-column {
+        grid-template-columns: minmax(0, 1fr) !important;
+        max-width: 920px;
+        margin-left: auto;
+        margin-right: auto;
     }
-
-    .validator-subgrid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
+    .btn-delete svg {
+        width: 14px;
+        height: 14px;
     }
-
-    .validator-subgrid.three-up {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+    .btn-geo svg {
+        width: 15px;
+        height: 15px;
     }
-
-    .validator-entry-list {
-        display: grid;
-        gap: 12px;
-    }
-
-    .validator-entry {
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 16px;
-        background: rgba(255, 249, 242, 0.72);
-    }
-
-    .validator-entry-header {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: center;
-        margin-bottom: 12px;
-    }
-
-    .validator-entry-header strong {
-        display: block;
-        margin-bottom: 4px;
-    }
-
-    .validator-muted {
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.5;
-    }
-
-    .validator-actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    .validator-photo-note {
-        color: var(--muted);
-        font-size: 12px;
-        margin-top: -6px;
-    }
-
-    .validator-help-list {
-        display: grid;
-        gap: 12px;
-    }
-
-    .validator-help-item {
-        padding: 14px 16px;
-        border-radius: 14px;
-        border: 1px solid var(--border);
-        background: rgba(255, 249, 242, 0.72);
-    }
-
-    .validator-help-item strong,
-    .validator-help-item span {
-        display: block;
-    }
-
-    .validator-help-item span {
-        color: var(--muted);
-        font-size: 13px;
-        margin-top: 6px;
-        line-height: 1.5;
-    }
-
-    .validator-empty {
-        padding: 18px;
-        border-radius: 16px;
-        border: 1px dashed var(--border);
-        background: rgba(255, 255, 255, 0.6);
-        color: var(--muted);
-    }
-
-    @media (max-width: 900px) {
-        .validator-subgrid,
-        .validator-subgrid.three-up {
-            grid-template-columns: 1fr;
-        }
+    .btn-geo.loading {
+        opacity: 0.75;
+        pointer-events: none;
     }
 </style>
 @endsection
@@ -139,7 +54,7 @@
     if (! is_array($oldFamilies) || count($oldFamilies) === 0) {
         $oldFamilies = [$defaultFamily];
     }
-    $oldFamilies = array_map(function (array $family): array {
+    $oldFamilies = array_map(function (array $family) use ($defaultFamily): array {
         $family = array_merge($defaultFamily, $family);
 
         if (($family['firstName'] ?? '') === '' && ($family['lastName'] ?? '') === '' && ($family['familyHeadName'] ?? '') !== '') {
@@ -200,21 +115,33 @@
 @endif
 
 <div class="stats-grid">
-    <div class="stat-card">
-        <span>Disaster Reports</span>
-        <strong>{{ $stats['disaster_reports'] }}</strong>
+    <div class="stat-card overview-stat">
+        <div>
+            <span>Disaster Reports</span>
+            <strong>{{ $stats['disaster_reports'] }}</strong>
+        </div>
+        <div class="stat-icon"><x-icon name="alert-triangle" /></div>
     </div>
-    <div class="stat-card">
-        <span>Accident Reports</span>
-        <strong>{{ $stats['accident_reports'] }}</strong>
+    <div class="stat-card overview-stat">
+        <div>
+            <span>Accident Reports</span>
+            <strong>{{ $stats['accident_reports'] }}</strong>
+        </div>
+        <div class="stat-icon amber"><x-icon name="car" /></div>
     </div>
-    <div class="stat-card">
-        <span>Pending Review</span>
-        <strong>{{ $stats['pending_review'] }}</strong>
+    <div class="stat-card overview-stat">
+        <div>
+            <span>Pending Review</span>
+            <strong>{{ $stats['pending_review'] }}</strong>
+        </div>
+        <div class="stat-icon purple"><x-icon name="clipboard-check" /></div>
     </div>
-    <div class="stat-card">
-        <span>Family Records</span>
-        <strong>{{ $stats['family_records'] }}</strong>
+    <div class="stat-card overview-stat">
+        <div>
+            <span>Family Records</span>
+            <strong>{{ $stats['family_records'] }}</strong>
+        </div>
+        <div class="stat-icon green"><x-icon name="users" /></div>
     </div>
 </div>
 
@@ -238,8 +165,25 @@
     </section>
 </div>
 
-<div class="content-grid two-columns top-gap">
-    <section class="card">
+<div class="form-switcher-bar top-gap">
+    <div class="segmented-control" role="tablist" aria-label="Select report form">
+        <button type="button" class="segment-btn active" data-form="disaster" role="tab" aria-selected="true">
+            <x-icon name="alert-triangle" />
+            <span>Disaster Damage Report</span>
+        </button>
+        <button type="button" class="segment-btn" data-form="accident" role="tab" aria-selected="false">
+            <x-icon name="car" />
+            <span>Vehicular Accident Report</span>
+        </button>
+        <button type="button" class="segment-btn" data-form="both" role="tab" aria-selected="false">
+            <x-icon name="layout-dashboard" />
+            <span>Side by Side</span>
+        </button>
+    </div>
+</div>
+
+<div class="content-grid two-columns top-gap forms-container" id="forms-container">
+    <section class="card form-pane" id="pane-disaster">
         <div class="section-heading">
             <div>
                 <h2>Browser Disaster Damage Report</h2>
@@ -307,7 +251,10 @@
                         <strong>Primary GPS Coordinates</strong>
                         <p class="validator-muted">Leave blank to use the first family GPS point.</p>
                     </div>
-                    <button type="button" class="btn btn-secondary js-fill-location">Use Browser Location</button>
+                    <button type="button" class="btn btn-secondary btn-geo js-fill-location">
+                        <x-icon name="map-pin" />
+                        <span>Use My Location</span>
+                    </button>
                 </div>
                 <div class="validator-subgrid">
                     <div>
@@ -330,7 +277,10 @@
 
                 <div id="family-entry-list" class="validator-entry-list"></div>
                 <div class="validator-actions top-gap">
-                    <button type="button" class="btn btn-secondary" id="add-family-entry">Add Affected Family</button>
+                    <button type="button" class="btn btn-secondary" id="add-family-entry">
+                        <x-icon name="plus" />
+                        <span>Add Affected Family</span>
+                    </button>
                 </div>
             </div>
 
@@ -341,12 +291,15 @@
             </div>
 
             <div class="validator-actions">
-                <button type="submit" class="btn btn-primary">Submit Disaster Report</button>
+                <button type="submit" class="btn btn-primary">
+                    <x-icon name="alert-triangle" />
+                    <span>Submit Disaster Damage Report</span>
+                </button>
             </div>
         </form>
     </section>
 
-    <section class="card">
+    <section class="card form-pane" id="pane-accident">
         <div class="section-heading">
             <div>
                 <h2>Browser Vehicular Accident Report</h2>
@@ -421,7 +374,10 @@
                         <strong>Accident GPS Coordinates</strong>
                         <p class="validator-muted">Use browser location or type field-note coordinates.</p>
                     </div>
-                    <button type="button" class="btn btn-secondary js-fill-location">Use Browser Location</button>
+                    <button type="button" class="btn btn-secondary btn-geo js-fill-location">
+                        <x-icon name="map-pin" />
+                        <span>Use My Location</span>
+                    </button>
                 </div>
                 <div class="validator-subgrid">
                     <div>
@@ -444,7 +400,10 @@
 
                 <div id="person-entry-list" class="validator-entry-list"></div>
                 <div class="validator-actions top-gap">
-                    <button type="button" class="btn btn-secondary" id="add-person-entry">Add Involved Person</button>
+                    <button type="button" class="btn btn-secondary" id="add-person-entry">
+                        <x-icon name="plus" />
+                        <span>Add Involved Person</span>
+                    </button>
                 </div>
             </div>
 
@@ -455,7 +414,10 @@
             </div>
 
             <div class="validator-actions">
-                <button type="submit" class="btn btn-primary">Submit Accident Report</button>
+                <button type="submit" class="btn btn-primary">
+                    <x-icon name="car" />
+                    <span>Submit Accident Report</span>
+                </button>
             </div>
         </form>
     </section>
@@ -486,14 +448,22 @@
             <tbody>
                 @forelse($recentSubmissions as $submission)
                     <tr>
-                        <td>{{ $submission['code'] }}</td>
-                        <td>{{ $submission['module'] }}</td>
+                        <td><strong>{{ $submission['code'] }}</strong></td>
+                        <td><span class="badge {{ $submission['module'] === 'Accident' ? 'badge-amber' : 'badge-blue' }}">{{ $submission['module'] }}</span></td>
                         <td>{{ $submission['title'] }}</td>
                         <td>{{ $submission['barangay'] }}</td>
                         <td>{{ $submission['details'] }}</td>
-                        <td>{{ $submission['coordinates'] }}</td>
-                        <td>{{ $submission['severity'] }}</td>
-                        <td>{{ $submission['status'] }}</td>
+                        <td><small class="muted">{{ $submission['coordinates'] }}</small></td>
+                        <td>
+                            <span class="badge badge-{{ strtolower($submission['severity']) === 'high' || strtolower($submission['severity']) === 'severe' || strtolower($submission['severity']) === 'fatal' ? 'red' : (strtolower($submission['severity']) === 'medium' || strtolower($submission['severity']) === 'moderate' || strtolower($submission['severity']) === 'injury' ? 'amber' : 'green') }}">
+                                {{ $submission['severity'] }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-{{ strtolower($submission['status']) === 'validated' ? 'green' : (strtolower($submission['status']) === 'pending' ? 'blue' : 'amber') }}">
+                                {{ $submission['status'] }}
+                            </span>
+                        </td>
                         <td>{{ $submission['submitted_at'] }}</td>
                     </tr>
                 @empty
@@ -510,35 +480,30 @@
     <div class="validator-entry">
         <div class="validator-entry-header">
             <div>
-                <strong>Affected family <span class="js-entry-number">1</span></strong>
-                <p class="validator-muted">Encode the same family-level details collected in the Expo app.</p>
+                <strong>Affected Family #<span class="js-entry-number">1</span></strong>
+                <p class="validator-muted">Encode the family-level details collected during the assessment.</p>
             </div>
-            <button type="button" class="btn btn-delete js-remove-entry">Remove</button>
+            <button type="button" class="btn btn-delete js-remove-entry">
+                <x-icon name="trash" />
+                <span>Remove</span>
+            </button>
         </div>
 
         <div class="validator-subgrid">
             <div>
                 <label for="family-first-name-__INDEX__">First Name</label>
-                <input type="text" id="family-first-name-__INDEX__" data-name-template="families[__INDEX__][firstName]" data-id-template="family-first-name-__INDEX__" data-field="firstName" required>
+                <input type="text" id="family-first-name-__INDEX__" data-name-template="families[__INDEX__][firstName]" data-id-template="family-first-name-__INDEX__" data-field="firstName" placeholder="First name" required>
             </div>
             <div>
                 <label for="family-last-name-__INDEX__">Last Name</label>
-                <input type="text" id="family-last-name-__INDEX__" data-name-template="families[__INDEX__][lastName]" data-id-template="family-last-name-__INDEX__" data-field="lastName" required>
+                <input type="text" id="family-last-name-__INDEX__" data-name-template="families[__INDEX__][lastName]" data-id-template="family-last-name-__INDEX__" data-field="lastName" placeholder="Last name" required>
             </div>
         </div>
 
         <div class="validator-subgrid">
             <div>
                 <label for="family-members-__INDEX__">Household Members</label>
-                <input type="number" min="1" id="family-members-__INDEX__" data-name-template="families[__INDEX__][householdMembers]" data-id-template="family-members-__INDEX__" data-field="householdMembers">
-            </div>
-            <div></div>
-        </div>
-
-        <div class="validator-subgrid">
-            <div>
-                <label for="family-contact-__INDEX__">Contact Number</label>
-                <input type="text" id="family-contact-__INDEX__" data-name-template="families[__INDEX__][contactNumber]" data-id-template="family-contact-__INDEX__" data-field="contactNumber">
+                <input type="number" min="1" id="family-members-__INDEX__" data-name-template="families[__INDEX__][householdMembers]" data-id-template="family-members-__INDEX__" data-field="householdMembers" placeholder="Count">
             </div>
             <div>
                 <label for="family-evacuation-__INDEX__">Evacuation Status</label>
@@ -559,12 +524,15 @@
                     @endforeach
                 </select>
             </div>
-            <div></div>
+            <div>
+                <label for="family-contact-__INDEX__">Contact Number</label>
+                <input type="text" id="family-contact-__INDEX__" data-name-template="families[__INDEX__][contactNumber]" data-id-template="family-contact-__INDEX__" data-field="contactNumber" placeholder="09xxxxxxxxx">
+            </div>
         </div>
 
         <div>
             <label for="family-description-__INDEX__">Family Description</label>
-            <textarea id="family-description-__INDEX__" rows="3" data-name-template="families[__INDEX__][description]" data-id-template="family-description-__INDEX__" data-field="description"></textarea>
+            <textarea id="family-description-__INDEX__" rows="3" data-name-template="families[__INDEX__][description]" data-id-template="family-description-__INDEX__" data-field="description" placeholder="Notes on damages, needs, or status"></textarea>
         </div>
 
         <div class="validator-entry js-geo-row">
@@ -573,16 +541,19 @@
                     <strong>Family GPS Coordinates</strong>
                     <p class="validator-muted">Optional per-family geotagging for affected-area mapping.</p>
                 </div>
-                <button type="button" class="btn btn-secondary js-fill-location">Use Browser Location</button>
+                <button type="button" class="btn btn-secondary btn-geo js-fill-location">
+                    <x-icon name="map-pin" />
+                    <span>Use My Location</span>
+                </button>
             </div>
             <div class="validator-subgrid">
                 <div>
                     <label for="family-latitude-__INDEX__">Latitude</label>
-                    <input type="text" id="family-latitude-__INDEX__" class="js-lat" data-name-template="families[__INDEX__][latitude]" data-id-template="family-latitude-__INDEX__" data-field="latitude">
+                    <input type="text" id="family-latitude-__INDEX__" class="js-lat" data-name-template="families[__INDEX__][latitude]" data-id-template="family-latitude-__INDEX__" data-field="latitude" placeholder="6.688099">
                 </div>
                 <div>
                     <label for="family-longitude-__INDEX__">Longitude</label>
-                    <input type="text" id="family-longitude-__INDEX__" class="js-lng" data-name-template="families[__INDEX__][longitude]" data-id-template="family-longitude-__INDEX__" data-field="longitude">
+                    <input type="text" id="family-longitude-__INDEX__" class="js-lng" data-name-template="families[__INDEX__][longitude]" data-id-template="family-longitude-__INDEX__" data-field="longitude" placeholder="125.166607">
                 </div>
             </div>
         </div>
@@ -599,20 +570,23 @@
     <div class="validator-entry">
         <div class="validator-entry-header">
             <div>
-                <strong>Person #<span class="js-entry-number">1</span></strong>
+                <strong>Involved Person #<span class="js-entry-number">1</span></strong>
                 <p class="validator-muted">Optional repeated person entries from the browser dashboard.</p>
             </div>
-            <button type="button" class="btn btn-delete js-remove-entry">Remove</button>
+            <button type="button" class="btn btn-delete js-remove-entry">
+                <x-icon name="trash" />
+                <span>Remove</span>
+            </button>
         </div>
 
         <div class="validator-subgrid">
             <div>
                 <label for="person-first-name-__INDEX__">First Name</label>
-                <input type="text" id="person-first-name-__INDEX__" data-name-template="involvedPersons[__INDEX__][firstName]" data-id-template="person-first-name-__INDEX__" data-field="firstName">
+                <input type="text" id="person-first-name-__INDEX__" data-name-template="involvedPersons[__INDEX__][firstName]" data-id-template="person-first-name-__INDEX__" data-field="firstName" placeholder="First name">
             </div>
             <div>
                 <label for="person-last-name-__INDEX__">Last Name</label>
-                <input type="text" id="person-last-name-__INDEX__" data-name-template="involvedPersons[__INDEX__][lastName]" data-id-template="person-last-name-__INDEX__" data-field="lastName">
+                <input type="text" id="person-last-name-__INDEX__" data-name-template="involvedPersons[__INDEX__][lastName]" data-id-template="person-last-name-__INDEX__" data-field="lastName" placeholder="Last name">
             </div>
         </div>
 
@@ -621,12 +595,10 @@
                 <label for="person-role-__INDEX__">Role</label>
                 <input type="text" id="person-role-__INDEX__" data-name-template="involvedPersons[__INDEX__][role]" data-id-template="person-role-__INDEX__" data-field="role" placeholder="Driver, Passenger, Pedestrian">
             </div>
-            <div></div>
-        </div>
-
-        <div>
-            <label for="person-contact-__INDEX__">Contact Number</label>
-            <input type="text" id="person-contact-__INDEX__" data-name-template="involvedPersons[__INDEX__][contactNumber]" data-id-template="person-contact-__INDEX__" data-field="contactNumber">
+            <div>
+                <label for="person-contact-__INDEX__">Contact Number</label>
+                <input type="text" id="person-contact-__INDEX__" data-name-template="involvedPersons[__INDEX__][contactNumber]" data-id-template="person-contact-__INDEX__" data-field="contactNumber" placeholder="09xxxxxxxxx">
+            </div>
         </div>
     </div>
 </template>
@@ -692,6 +664,11 @@
     if (validatorBounds.length > 0) {
         validatorMap.fitBounds(validatorBounds, { padding: [28, 28] });
     }
+
+    if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(() => validatorMap.invalidateSize()).observe(document.getElementById('validator-submission-map'));
+    }
+    window.addEventListener('resize', () => validatorMap.invalidateSize());
 
     function renumberEntries(containerSelector) {
         const container = document.querySelector(containerSelector);
@@ -792,13 +769,73 @@
             return;
         }
 
+        const originalHtml = locationButton.innerHTML;
+        locationButton.classList.add('loading');
+        locationButton.disabled = true;
+        locationButton.innerHTML = '<span>Acquiring GPS...</span>';
+
         navigator.geolocation.getCurrentPosition((position) => {
             latInput.value = position.coords.latitude.toFixed(6);
             lngInput.value = position.coords.longitude.toFixed(6);
+            locationButton.classList.remove('loading');
+            locationButton.classList.add('success');
+            locationButton.innerHTML = '<span>✓ Location Set</span>';
+            setTimeout(() => {
+                locationButton.classList.remove('success');
+                locationButton.disabled = false;
+                locationButton.innerHTML = originalHtml;
+            }, 2500);
         }, () => {
-            window.alert('Unable to read your browser location. You can still type the coordinates manually.');
+            locationButton.classList.remove('loading');
+            locationButton.disabled = false;
+            locationButton.innerHTML = '<span>GPS Unavailable</span>';
+            setTimeout(() => {
+                locationButton.innerHTML = originalHtml;
+            }, 3000);
+        }, {
+            enableHighAccuracy: true,
+            timeout: 10000,
         });
     });
+
+    // Form Switcher Tabs
+    const formTabs = document.querySelectorAll('.segmented-control [data-form]');
+    const formsContainer = document.getElementById('forms-container');
+    const paneDisaster = document.getElementById('pane-disaster');
+    const paneAccident = document.getElementById('pane-accident');
+
+    function setFormTab(mode) {
+        formTabs.forEach((tab) => {
+            const isActive = tab.dataset.form === mode;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-selected', String(isActive));
+        });
+
+        if (mode === 'disaster') {
+            paneDisaster.classList.remove('is-hidden');
+            paneAccident.classList.add('is-hidden');
+            formsContainer.classList.add('forms-single-column');
+        } else if (mode === 'accident') {
+            paneDisaster.classList.add('is-hidden');
+            paneAccident.classList.remove('is-hidden');
+            formsContainer.classList.add('forms-single-column');
+        } else {
+            paneDisaster.classList.remove('is-hidden');
+            paneAccident.classList.remove('is-hidden');
+            formsContainer.classList.remove('forms-single-column');
+        }
+    }
+
+    formTabs.forEach((tab) => {
+        tab.addEventListener('click', () => setFormTab(tab.dataset.form));
+    });
+
+    const initialFormContext = @json(old('form_context', 'disaster'));
+    if (initialFormContext === 'accident') {
+        setFormTab('accident');
+    } else {
+        setFormTab('disaster');
+    }
 
     document.getElementById('disaster-web-form').addEventListener('submit', () => {
         renumberEntries(familyContainerSelector);

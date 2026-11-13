@@ -972,7 +972,7 @@ body::-webkit-scrollbar-track,
 }
 
 .map-canvas {
-    min-height: clamp(300px, 42vw, 420px);
+    height: clamp(280px, 36vh, 380px);
     width: 100%;
 }
 
@@ -1874,7 +1874,7 @@ textarea {
     }
 
     .map-canvas {
-        min-height: 300px;
+        height: 280px;
     }
 
     .card,
